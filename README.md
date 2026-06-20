@@ -11,6 +11,7 @@ Morbit is a non-custodial real-world asset lending protocol on **Robinhood Chain
 ```
 contracts/               Solidity + Hardhat Ignition deployment
   ├── contracts/         RWAPool.sol (upgradeable)
+  ├── test/              RWAPool.ts contract tests
   ├── ignition/          Declarative deployment modules
   ├── config/            Token addresses & reserve parameters
   └── scripts/           Init-reserves, sync-deployment
