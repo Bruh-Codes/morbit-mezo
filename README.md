@@ -101,9 +101,19 @@ cd contracts
 yarn install
 cp .env.example .env
 npx hardhat compile
+bun run test
 ```
 
 Required env vars: `DEPLOYER_PRIVATE_KEY`
+
+The contract test suite lives in `contracts/test/RWAPool.ts` and covers reserve setup, supply/borrow/repay flows, collateral safety checks, interest accrual, rescue access control, and liquidation behavior.
+
+To run the tests locally:
+
+```bash
+cd contracts
+bun run test
+```
 
 ### Deployment Flow
 
@@ -177,7 +187,7 @@ Once live, update `aave-compat.ts`'s `useUserTransactionHistory` stub to query y
 | Script | Description |
 |--------|-------------|
 | `npx hardhat compile` | Compile Solidity |
-| `npx hardhat test` | Run tests |
+| `bun run test` | Run the RWAPool contract tests |
 | `npx hardhat ignition deploy ...` | Deploy via Ignition |
 | `npx hardhat run scripts/init-reserves.js` | Initialize Robinhood reserves |
 | `npx hardhat run scripts/init-reserves-arbitrum.js` | Initialize Arbitrum reserves |

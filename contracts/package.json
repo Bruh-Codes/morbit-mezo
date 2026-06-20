@@ -4,6 +4,7 @@
   "packageManager": "yarn@4.9.2",
   "scripts": {
     "compile": "hardhat compile",
+    "test": "node --import tsx/esm --test \"test/*.ts\"",
     "deploy": "hardhat ignition deploy ignition/modules/RWAPoolModule.js",
     "init:reserves": "hardhat run scripts/init-reserves.js"
   },
