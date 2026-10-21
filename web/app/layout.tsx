@@ -9,9 +9,9 @@ import NextTopLoader from 'nextjs-toploader';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Morbit | MUSD Liquidity',
+  title: 'Morbit | Borrow and earn with MUSD on Mezo',
   description:
-    'Explore MUSD liquidity pools, manage positions, and try Simple Earn. Pool metrics and actions are illustrative in this demo.',
+    'Borrow MUSD against BTC and earn with it through the Morbit Simple Earn vault, live on Mezo testnet.',
   icons: {
     icon: '/icon.svg',
   },

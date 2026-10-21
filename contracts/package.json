@@ -5,8 +5,8 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "node --import tsx/esm --test \"test/*.ts\"",
-    "deploy": "hardhat ignition deploy ignition/modules/RWAPoolModule.js",
-    "init:reserves": "hardhat run scripts/init-reserves.js"
+    "deploy:mezo": "hardhat run scripts/deploy-mezo.js --network mezoTestnet",
+    "smoke:mezo": "hardhat run scripts/smoke-mezo.js --network mezoTestnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.13",
@@ -17,6 +17,7 @@
     "@openzeppelin/contracts": "^5.6.1",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",
     "ethers": "^6.16.0",
-    "hardhat": "^3.9.0"
+    "hardhat": "^3.9.0",
+    "tsx": "^4.23.15"
   }
 }

@@ -8,6 +8,8 @@ export default defineConfig({
   plugins: [hardhatKeystore, hardhatEthers, hardhatIgnition, hardhatIgnitionEthers],
   solidity: {
     version: "0.8.28",
+    // Optional local solc binary for machines that cannot download compilers.
+    ...(process.env.SOLC_PATH ? { path: process.env.SOLC_PATH } : {}),
     settings: {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
@@ -21,6 +23,12 @@ export default defineConfig({
     development: {
       type: "edr-simulated",
       chainType: "l1",
+    },
+    mezoTestnet: {
+      type: "http",
+      url: process.env.MEZO_RPC_URL || "https://rpc.test.mezo.org",
+      chainId: 31611,
+      accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
     robinhoodTestnet: {
       type: "http",

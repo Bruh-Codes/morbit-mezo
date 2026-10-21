@@ -1,260 +1,137 @@
-<img width="400" alt="Frame 2085660247" src="https://github.com/user-attachments/assets/85b0d927-08fc-44fe-a48f-8097a326785f" />
+<img width="400" alt="Morbit" src="https://github.com/user-attachments/assets/85b0d927-08fc-44fe-a48f-8097a326785f" />
 
-# Morbit — MUSD Liquidity Demo
+# Morbit: borrow MUSD against BTC, then put it to work
 
-Morbit is being shaped into a managed MUSD liquidity product for the Mezo Buildathon. Users can explore sample pools, simulate deposits and withdrawals, review positions, and try the Simple Earn allocation flow. The current web screens are a local demo; pool metrics, yields, and liquidity actions are not connected to live contracts.
+Morbit is a MUSD app on Mezo. In one place you can:
 
-The repository still contains the earlier RWA lending contracts and integrations. They do not implement this MUSD product. See [MORBIT_MEZO_BUILDATHON_SPEC.md](MORBIT_MEZO_BUILDATHON_SPEC.md) for the product scope and buildathon requirements.
+- **Borrow:** open a trove with BTC as collateral and mint MUSD, then add or withdraw collateral, borrow more, repay, or close. Morbit calls Mezo's own MUSD contracts (`BorrowerOperations`, `TroveManager`, `SortedTroves`, `PriceFeed`), so the trove lives in the MUSD protocol.
+- **Simple Earn:** deposit MUSD into the Morbit vault (`MorbitEarnVault`, share token `mvMUSD`). The vault supplies everything to the MUSD Stability Pool, which pays the debt of liquidated troves and gives depositors their BTC collateral. Withdrawals pay out your share of the vault's MUSD and BTC.
+- **Dashboard and Activity:** see wallet balances (BTC, MUSD, MEZO), trove health, liquidation price and Simple Earn value, plus every transaction with an explorer link.
+
+Everything in the UI is read from Mezo testnet (chain 31611). There is no sample data.
+
+Built for the [Mezo Buildathon](https://app.akindo.io/wave-hacks/OVOO0gdrVU8379D10), DeFi track.
 
 ---
 
-## Architecture
+## How it fits together
 
 ```
-contracts/               Solidity + Hardhat Ignition deployment
-  ├── contracts/         RWAPool.sol (upgradeable)
-  ├── test/              RWAPool.ts contract tests
-  ├── ignition/          Declarative deployment modules
-  ├── config/            Token addresses & reserve parameters
-  └── scripts/           Init-reserves, sync-deployment
-
-web/                     Next.js 16 frontend
-  ├── protocol/          aave-compat stub layer + rwaContracts
-  ├── modules/           Feature UI (markets, dashboard, history)
-  ├── store/             Zustand slices (incl. local tx storage)
-  └── ui-config/         Markets, networks, wagmi
-
-indexer/                 Subgraph for The Graph
-  ├── schema.graphql     Entities: Reserve, User, 5 tx types
-  ├── subgraph.yaml      Manifest → RWAPool
-  └── src/mapping.ts     Event handlers for all 9 events
+           Morbit web app (Next.js, wagmi, viem)
+              │                         │
+     Borrow   │                         │  Simple Earn
+              ▼                         ▼
+   MUSD BorrowerOperations      MorbitEarnVault (mvMUSD)
+   TroveManager, SortedTroves           │ provideToSP / withdrawFromSP
+   PriceFeed                            ▼
+              │                  MUSD StabilityPool
+              └──── BTC collateral ◄────┘ liquidation gains (BTC)
 ```
 
+### MUSD integration
+
+| What Morbit does | MUSD contract | Function |
+|---|---|---|
+| Open a trove, BTC in, MUSD out | BorrowerOperations | `openTrove` (payable) |
+| Add or withdraw BTC, borrow more, repay | BorrowerOperations | `adjustTrove` |
+| Close a trove | BorrowerOperations | `closeTrove` |
+| Hints so trove inserts stay cheap | SortedTroves | `findInsertPosition` |
+| Trove state, collateral ratio, system ratio | TroveManager | `getTroveStatus`, `getTroveColl`, `getTroveDebt`, `getCurrentICR`, `getTCR` |
+| Minimum debt and borrowing fee | BorrowerOperations | `minNetDebt`, `borrowingRate` |
+| BTC price | PriceFeed | `fetchPrice` |
+| Simple Earn deposits and withdrawals | StabilityPool | `provideToSP`, `withdrawFromSP` |
+| Vault value | StabilityPool | `getCompoundedMUSDDeposit`, `getDepositorCollateralGain` |
+
+### MorbitEarnVault
+
+`contracts/contracts/MorbitEarnVault.sol`
+
+- `deposit(assets, receiver)` takes MUSD, mints mvMUSD at the current share price and supplies the MUSD to the Stability Pool in the same transaction.
+- `redeem(shares, receiver, owner)` burns shares and pays the pro-rata MUSD and BTC. Nothing is swapped.
+- `totalAssets()` values the vault in MUSD: idle MUSD, plus the compounded Stability Pool deposit, plus held and pending BTC at the MUSD PriceFeed price.
+- A virtual share and asset of 1 protect against first-depositor inflation. Only the Stability Pool can send BTC to the vault.
+- The owner can set a deposit cap or pause deposits. Withdrawals can never be paused.
+- The Stability Pool refuses MUSD withdrawals while a trove sits below 110% and has not been liquidated yet. The vault passes that revert through, and the UI explains it.
+
+Earnings come only from liquidations, so they can be zero for long periods. The vault is not audited.
+
 ---
 
-## Markets
-
-| Market        | Chain ID | Type     | Collateral Assets                     | Borrow Asset |
-| ------------- | -------: | -------- | ------------------------------------- | ------------ |
-| Robinhood RWA |    46630 | RWA      | TSLA, AMZN, PLTR, NFLX, AMD           | USDG         |
-| Arbitrum RWA  |   421614 | RWA      | OUSG (Ondo), USDY (Ondo)              | USDC         |
-
----
-
-## Smart Contracts
-
-### RWAPool.sol
-
-Upgradeable lending pool (`Initializable` + `OwnableUpgradeable`) with a `TransparentUpgradeableProxy`.
-
-| Function | Description |
-|----------|-------------|
-| `supply` | Deposit collateral (stocks or USDG) |
-| `withdraw` | Redeem supplied collateral |
-| `borrow` | Draw USDG against collateral |
-| `repay` | Repay borrowed USDG |
-| `liquidationCall` | Seize undercollateralized positions |
-| `getAllReservesData` | Batch reserve view |
-| `getUserAccountData` | User health factor, LTV, totals |
-
-### Deployed on Robinhood Testnet (chain 46630)
+## Addresses (Mezo testnet, chain 31611)
 
 | Contract | Address |
-|----------|---------|
-| **RWAPool** | `0xCB7460EdA8379D0eE4D2E008216E40DB782254cc` |
-| RWAPool (impl) | `0x1096b29aAAC0079A3Dba4A2B370CdAc58D8A1B57` |
-| ProxyAdmin | `0x23e2B6E25F65CBD21C3D798F284744391564B3B5` |
-| USDG | `0x7E955252E15c84f5768B83c41a71F9eba181802F` |
-| TSLA | `0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E` |
-| AMZN | `0x5884aD2f920c162CFBbACc88C9C51AA75eC09E02` |
-| PLTR | `0x1FBE1a0e43594b3455993B5dE5Fd0A7A266298d0` |
-| NFLX | `0x3b8262A63d25f0477c4DDE23F83cfe22Cb768C93` |
-| AMD | `0x71178BAc73cBeb415514eB542a8995b82669778d` |
-| WETH | `0x7943e237c7F95DA44E0301572D358911207852Fa` |
+|---|---|
+| MUSD | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` |
+| BorrowerOperations | `0xCdF7028ceAB81fA0C6971208e83fa7872994beE5` |
+| TroveManager | `0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0` |
+| PriceFeed | `0x86bCF0841622a5dAC14A313a15f96A95421b9366` |
+| BTC (ERC-20 precompile) | `0x7b7C000000000000000000000000000000000000` |
+| MEZO (ERC-20 precompile) | `0x7B7c000000000000000000000000000000000001` |
+| StabilityPool, SortedTroves | Read from `TroveManager` at deploy time |
+| MorbitEarnVault | Written to `web/ui-config/mezoDeployment.json` by the deploy script |
 
-### Deployed on Arbitrum Sepolia (chain 421614)
-
-| Contract | Address |
-|----------|---------|
-| **RWAPool** | `0x73caA38805406520f1A6D8c4BD8D1F6Ca7CC5549` |
-| USDC | `0xe00da2a8Dd940482AC30d13dBd346F108BAAdab3` |
-| OUSG | `0x73926de4Fa5A4F9B746AF417B0dd4F8213572950` |
-| USDY | `0x3cD2e554acFb12126F9d1A91b599549B971680C8` |
-| WETH | `0x7943e237c7F95DA44E0301572D358911207852Fa` |
+Sources: [Mezo contracts reference](https://mezo.org/docs/users/resources/contracts-reference/) and [mezo-org/musd](https://github.com/mezo-org/musd).
 
 ---
 
-## Getting Started
-
-### Frontend
-
-```bash
-cd web
-yarn install
-cp .env.example .env.local
-yarn dev
-```
-
-Required env vars: `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`
+## Run it
 
 ### Contracts
 
 ```bash
 cd contracts
 yarn install
-cp .env.example .env
-npx hardhat compile
-bun run test
+yarn test                 # vault tests against a mock Stability Pool and PriceFeed
 ```
 
-Required env vars: `DEPLOYER_PRIVATE_KEY`
-
-The contract test suite lives in `contracts/test/RWAPool.ts` and covers reserve setup, supply/borrow/repay flows, collateral safety checks, interest accrual, rescue access control, and liquidation behavior.
-
-To run the tests locally:
+Deploy the vault and run a live end-to-end check on Mezo testnet:
 
 ```bash
-cd contracts
-bun run test
+cp .env.example .env      # set DEPLOYER_PRIVATE_KEY, funded with testnet BTC
+export DEPLOYER_PRIVATE_KEY=0x...
+yarn deploy:mezo          # deploys MorbitEarnVault, writes web/ui-config/mezoDeployment.json
+yarn smoke:mezo           # opens a trove, deposits MUSD into the vault, redeems half
 ```
 
-### Deployment Flow
+Get testnet BTC from the [Mezo faucet](https://faucet.test.mezo.org). The smoke test locks 0.04 BTC by default (`SMOKE_COLL_BTC`), because the minimum trove debt is 1,800 MUSD plus a 200 MUSD reserve.
 
-```
-contracts/config/tokens.js              ← single source of truth (Robinhood)
-contracts/config/tokens-arbitrum.js     ← single source of truth (Arbitrum)
-         ↓
-contracts/ignition/deployments/         ← Hardhat Ignition artifacts
-         ↓
-node scripts/sync-deployment.js         ← Robinhood: artifacts + tokens.js
-node scripts/sync-arbitrum-deployment.js ← Arbitrum: artifacts + tokens-arbitrum.js
-         ↓
-web/ui-config/robinhoodDeployment.json  ← consumed by UI (Robinhood)
-web/ui-config/arbitrumDeployment.json   ← consumed by UI (Arbitrum)
-```
+If Hardhat cannot download the compiler, point `SOLC_PATH` at a local solc 0.8.28 binary.
 
-No env var overrides for pool or token addresses. Chain switching is handled by `currentDeployment.ts` which selects the right config based on chain ID.
-
----
-
-## Transaction History
-
-Transactions submitted during a session are stored in the local Zustand store and appear immediately in the History page — no subgraph needed for the demo.
-
-### Option A: Out of the box (local only)
-Just works. Every supply, borrow, repay, withdraw you submit gets recorded and displayed.
-
-### Option B: Persistent history via The Graph
-
-A subgraph is scaffolded in `indexer/` for Robinhood Testnet. To deploy:
+### Web app
 
 ```bash
-cd indexer
+cd web
 yarn install
-npx graph codegen
-npx graph build
+cp .env.example .env.local   # optional: WalletConnect project id, custom RPC
+yarn dev
 ```
 
-You'll need a self-hosted Graph Node (Robinhood isn't in Graph Studio's default networks). Create a `docker-compose.yml` with:
+Connect a wallet such as MetaMask. The app asks to add and switch to Mezo testnet.
+
+### Deploy the web app
+
+`web/` is a standard Next.js app. On Vercel, import the repo and set the root directory to `web`.
+
+---
+
+## Repository
 
 ```
-graph-node → Postgres + IPFS
+contracts/
+  contracts/MorbitEarnVault.sol     Simple Earn vault
+  contracts/mocks/                  Test doubles for the Stability Pool, PriceFeed and MUSD
+  test/MorbitEarnVault.ts           Vault tests
+  scripts/deploy-mezo.js            Deploys the vault and writes the web config
+  scripts/smoke-mezo.js             Live end-to-end check on Mezo testnet
+  config/mezo-testnet.js            MUSD system addresses
+web/
+  modules/mezo/                     All app logic: config, ABIs, hooks, pages
+  app/(main)/                       Routes: /, /borrow, /earn, /dashboard, /history
+  ui-config/mezoDeployment.json     Addresses the app reads
 ```
 
-Then:
+## Limits
 
-```bash
-npx graph create --node http://localhost:8020 morbit/morbit-rwa
-npx graph deploy --node http://localhost:8020 --ipfs http://localhost:5001 morbit/morbit-rwa
-```
-
-Once live, update `aave-compat.ts`'s `useUserTransactionHistory` stub to query your Graph Node endpoint.
-
----
-
-## Available Scripts
-
-### Frontend (`web/`)
-
-| Script | Description |
-|--------|-------------|
-| `yarn dev` | Next.js dev server (Turbopack) |
-| `yarn build` | Production build |
-| `yarn start` | Serve production build |
-| `yarn lint` | ESLint |
-| `yarn lint:fix` | ESLint auto-fix |
-| `yarn i18n` | Extract & compile Lingui translations |
-
-### Contracts (`contracts/`)
-
-| Script | Description |
-|--------|-------------|
-| `npx hardhat compile` | Compile Solidity |
-| `bun run test` | Run the RWAPool contract tests |
-| `npx hardhat ignition deploy ...` | Deploy via Ignition |
-| `npx hardhat run scripts/init-reserves.js` | Initialize Robinhood reserves |
-| `npx hardhat run scripts/init-reserves-arbitrum.js` | Initialize Arbitrum reserves |
-| `node scripts/sync-deployment.js` | Sync Robinhood addresses to frontend |
-| `node scripts/sync-arbitrum-deployment.js` | Sync Arbitrum addresses to frontend |
-
-### Indexer (`indexer/`)
-
-| Script | Description |
-|--------|-------------|
-| `npx graph codegen` | Generate TypeScript types |
-| `npx graph build` | Compile mappings to WASM |
-| `npx graph deploy ...` | Deploy to Graph Node |
-
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `contracts/contracts/RWAPool.sol` | Upgradeable lending pool |
-| `contracts/ignition/modules/RWAPoolModule.ts` | Ignition deployment module (Robinhood) |
-| `contracts/ignition/modules/ArbitrumDeploymentModule.ts` | Ignition deployment module (Arbitrum) |
-| `contracts/config/tokens.js` | Robinhood token addresses & reserve params |
-| `contracts/config/tokens-arbitrum.js` | Arbitrum token addresses & reserve params |
-| `contracts/scripts/init-reserves.js` | On-chain reserve setup (Robinhood) |
-| `contracts/scripts/init-reserves-arbitrum.js` | On-chain reserve setup (Arbitrum) |
-| `contracts/scripts/sync-deployment.js` | Sync Robinhood addresses to frontend |
-| `contracts/scripts/sync-arbitrum-deployment.js` | Sync Arbitrum addresses to frontend |
-| `web/protocol/aave-compat.ts` | Stub layer routing Aave SDK calls → RWAPool |
-| `web/protocol/rwaContracts.ts` | On-chain glue (ABI, providers, fetchers) |
-| `web/protocol/rwaTokens.ts` | Token UI metadata |
-| `web/protocol/currentDeployment.ts` | Multi-chain deployment registry |
-| `web/store/transactionsSlice.ts` | Local transaction storage (Zustand) |
-| `web/hooks/useTransactionHistory.tsx` | History merge (local + SDK) |
-| `web/ui-config/robinhoodDeployment.json` | Auto-generated UI config (Robinhood) |
-| `web/ui-config/arbitrumDeployment.json` | Auto-generated UI config (Arbitrum) |
-| `indexer/subgraph.yaml` | Subgraph manifest |
-| `indexer/src/mapping.ts` | Event handler mappings |
-
----
-
-## Faucets
-
-| Asset | Faucet |
-|-------|--------|
-| USDG (Robinhood) | https://faucet.paxos.com/?network=robinhood |
-| ETH + Stock Tokens (Robinhood) | https://faucet.testnet.chain.robinhood.com/ |
-| USDC, OUSG, USDY (Arbitrum Sepolia) | https://faucet.quicknode.com/arbitrum/sepolia |
-
----
-
-## Notes
-
-- Both Robinhood and Arbitrum markets use the stub layer in `web/protocol/aave-compat.ts` that routes all `@aave/*` SDK calls to the RWAPool contract via ethers.
-- The multi-chain deployment registry (`currentDeployment.ts`) switches pool address, RPC, and token list based on chain ID.
-- Arbitrum Sepolia uses Ondo-style RWA tokens (OUSG, USDY) with USDC as the borrow asset — differentiates from the stock-based Robinhood market.
-- APY history charts use mock data generators — no subgraph dependency.
-- `ENABLE_TESTNET = true` is hardcoded so both testnets always appear.
-- Body background is set via inline `<script>` before React hydrates to prevent white flash on dark mode.
-- The Swap module is excluded from TypeScript type-checking via `tsconfig.json`.
-
----
-
-## License
-
-See the repository license file for details.
+- Testnet only. The vault is not audited.
+- Simple Earn uses one strategy, the MUSD Stability Pool. Morbit does not rebalance, compound or swap BTC gains.
+- The Activity page reads vault events from chain. Trove actions are listed from this browser's own record, each with its real transaction hash.

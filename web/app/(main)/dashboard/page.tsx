@@ -1,11 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { LiquidityDashboardPage } from 'modules/musd/MusdV1Pages';
-import { useRootStore } from 'store/root';
+import { DashboardPage } from 'modules/mezo/DashboardPage';
 
-export default function Dashboard() {
-  const trackEvent = useRootStore((store) => store.trackEvent);
-  useEffect(() => { trackEvent('Page Viewed', { 'Page Name': 'Dashboard' }); }, [trackEvent]);
-  return <LiquidityDashboardPage />;
+export default function Page() {
+  return <DashboardPage />;
 }

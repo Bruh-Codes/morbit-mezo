@@ -16,12 +16,6 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "baseUrl": ".",
-    "paths": {
-      "@amplitude/analytics-browser": ["./amplitude-stubs.ts"],
-      "@cowprotocol/cow-sdk": ["./cow-stubs.ts"],
-      "@lingui/conf": ["./lingui-conf-stub.ts"],
-      "@lingui/macro": ["./lingui-macro-stub.ts"]
-    },
     "typeRoots": [
       "./node_modules/@types"
     ],
