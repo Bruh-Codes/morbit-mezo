@@ -197,7 +197,7 @@ export function AppHeader() {
           display: 'flex',
           alignItems: 'center',
           flexDirection: 'space-between',
-          boxShadow: 'inset 0px -1px 0px rgba(255, 255, 255, 0.06)',
+          boxShadow: `inset 0px -1px 0px ${theme.palette.divider}`,
         })}
       >
         <Box
@@ -214,7 +214,7 @@ export function AppHeader() {
         >
           <img src={uiConfig.appLogo} alt="Morbit" width={72} height={40} />
         </Box>
-        <Box sx={{ mr: sm ? 1 : 3 }}>
+        <Box sx={{ display: 'none', mr: sm ? 1 : 3 }}>
           {ENABLE_TESTNET && (
             <ContentWithTooltip tooltipContent={testnetTooltip} offset={[0, -4]} withoutHover>
               <Button
@@ -234,7 +234,7 @@ export function AppHeader() {
             </ContentWithTooltip>
           )}
         </Box>
-        <Box sx={{ mr: sm ? 1 : 3 }}>
+        <Box sx={{ display: 'none', mr: sm ? 1 : 3 }}>
           {FORK_ENABLED && currentMarketData?.isFork && (
             <ContentWithTooltip tooltipContent={forkTooltip} offset={[0, -4]} withoutHover>
               <Button
@@ -267,7 +267,7 @@ export function AppHeader() {
             variant="dot"
             badgeContent=""
             color="secondary"
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, display: 'none' }}
           >
             <Button
               onClick={handleSwitchClick}

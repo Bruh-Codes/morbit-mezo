@@ -15,7 +15,7 @@ export const ContentContainer = ({ children }: ContentContainerProps) => {
         mt: { xs: '-32px', lg: '-46px', xl: '-44px', xxl: '-48px' },
       }}
     >
-      <Container>{children}</Container>
+      <Container maxWidth={false} sx={{ px: { xs: 2, xsm: 3, md: 5, xl: 8 } }}>{children}</Container>
     </Box>
   );
 };

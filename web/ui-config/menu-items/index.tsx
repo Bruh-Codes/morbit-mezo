@@ -20,8 +20,13 @@ export const navigation: Navigation[] = [
   },
   {
     link: ROUTES.markets,
-    title: t`Markets`,
+    title: t`Pools`,
     dataCy: 'menuMarkets',
+  },
+  {
+    link: ROUTES.history,
+    title: t`Transactions`,
+    dataCy: 'menuTransactions',
   },
 ];
 

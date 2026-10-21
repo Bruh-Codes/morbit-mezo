@@ -1,8 +1,10 @@
 <img width="400" alt="Frame 2085660247" src="https://github.com/user-attachments/assets/85b0d927-08fc-44fe-a48f-8097a326785f" />
 
-# Morbit — RWA Lending Protocol
+# Morbit — MUSD Liquidity Demo
 
-Morbit is a non-custodial real-world asset lending protocol on **Robinhood Chain Testnet** and **Arbitrum Sepolia**. On Robinhood, users supply tokenized stocks (TSLA, AMZN, PLTR, NFLX, AMD) as collateral and borrow USDG stablecoin. On Arbitrum Sepolia, users supply Ondo-style RWA tokens (OUSG, USDY) as collateral and borrow USDC.
+Morbit is being shaped into a managed MUSD liquidity product for the Mezo Buildathon. Users can explore sample pools, simulate deposits and withdrawals, review positions, and try the Simple Earn allocation flow. The current web screens are a local demo; pool metrics, yields, and liquidity actions are not connected to live contracts.
+
+The repository still contains the earlier RWA lending contracts and integrations. They do not implement this MUSD product. See [MORBIT_MEZO_BUILDATHON_SPEC.md](MORBIT_MEZO_BUILDATHON_SPEC.md) for the product scope and buildathon requirements.
 
 ---
 

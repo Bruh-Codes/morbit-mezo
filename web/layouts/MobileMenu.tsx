@@ -34,14 +34,14 @@ interface MobileMenuProps {
 const MenuItemsWrapper = ({ children, title }: { children: ReactNode; title: ReactNode }) => (
   <Box sx={{ mb: 6, '&:last-of-type': { mb: 0, '.MuiDivider-root': { display: 'none' } } }}>
     <Box sx={{ px: 2 }}>
-      <Typography variant="subheader2" sx={{ color: '#707070', px: 4, py: 2 }}>
+      <Typography variant="subheader2" sx={{ color: 'text.secondary', px: 4, py: 2 }}>
         {title}
       </Typography>
 
       {children}
     </Box>
 
-    <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.08)', mt: 6 }} />
+    <Divider sx={{ borderColor: 'divider', mt: 6 }} />
   </Box>
 );
 
@@ -89,16 +89,16 @@ export const MobileMenu = ({ open, setOpen, headerHeight }: MobileMenuProps) => 
             </MenuItemsWrapper>
             <MenuItemsWrapper title={<Trans>Links</Trans>}>
               <List>
-                <ListItem sx={{ cursor: 'pointer', color: '#FFFFFF' }} onClick={handleOpenReadMode}>
+                <ListItem sx={{ cursor: 'pointer', color: 'text.primary' }} onClick={handleOpenReadMode}>
                   <ListItemText>
                     <Trans>Watch wallet</Trans>
                   </ListItemText>
                 </ListItem>
 
                 {moreNavigation.map((item, index) => (
-                  <ListItem component={Link} href={item.link} sx={{ color: '#FFFFFF' }} key={index}>
+                    <ListItem component={Link} href={item.link} sx={{ color: 'text.primary' }} key={index}>
                     <ListItemIcon sx={{ minWidth: 'unset', mr: 3 }}>
-                      <SvgIcon sx={{ fontSize: '20px', color: '#FFFFFF' }}>{item.icon}</SvgIcon>
+                      <SvgIcon sx={{ fontSize: '20px', color: 'text.primary' }}>{item.icon}</SvgIcon>
                     </ListItemIcon>
 
                     <ListItemText>{i18n._(item.title)}</ListItemText>

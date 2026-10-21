@@ -3,6 +3,7 @@ import { Trans } from '@lingui/macro';
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   SvgIcon,
   Typography,
@@ -11,6 +12,8 @@ import {
 } from '@mui/material';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ConnectWalletPaper } from 'components/ConnectWalletPaper';
+import { ListColumn } from 'components/lists/ListColumn';
+import { ListItem } from 'components/lists/ListItem';
 import { ListWrapper } from 'components/lists/ListWrapper';
 import { SearchInput } from 'components/SearchInput';
 import { applyTxHistoryFilters, useTransactionHistory } from 'hooks/useTransactionHistory';
@@ -254,21 +257,38 @@ export const HistoryWrapper = () => {
           </Button>
         </Box>
       ) : !isFetchingNextPage ? (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            p: 4,
-            flex: 1,
-          }}
-        >
-          <Typography sx={{ my: 24 }} variant="h3" color="text.primary">
-            <Trans>No transactions yet.</Trans>
+        <>
+          <Typography variant="h4" color="text.primary" sx={{ ml: 9, mt: 6, mb: 2 }}>
+            Demo transaction
           </Typography>
-        </Box>
+          <Box px={6}>
+            <ListItem
+              px={3}
+              sx={{ borderWidth: '1px 0 0 0', borderStyle: 'solid', borderColor: 'divider', minHeight: 72 }}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', mr: 6 }}>
+                <Typography sx={{ width: 180 }}>Add liquidity</Typography>
+                <Typography variant="caption" color="text.muted">
+                  {new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleString()}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
+                <Box component="img" src="/icons/tokens/musd.svg" alt="MUSD logo" sx={{ width: 24, height: 24 }} />
+                <Typography noWrap>$40.00 MUSD</Typography>
+                <Typography color="text.secondary">+</Typography>
+                <Box component="img" src="/icons/tokens/usdc.svg" alt="USDC logo" sx={{ width: 24, height: 24 }} />
+                <Typography noWrap>$30.00 USDC</Typography>
+                <Typography color="text.secondary" sx={{ ml: 1 }} noWrap>Aerodrome · Base</Typography>
+              </Box>
+              <ListColumn align="right" minWidth={110}>
+                <Chip size="small" label="Simulated" />
+              </ListColumn>
+            </ListItem>
+          </Box>
+          <Typography variant="description" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+            Demo only · No wallet transaction was sent.
+          </Typography>
+        </>
       ) : (
         <></>
       )}

@@ -11,7 +11,7 @@
   },
   "scripts": {
     "deploy:contracts": "node contracts/deploy.mjs",
-    "dev": "bun --bun next dev",
+    "dev": "bun --bun ./node_modules/next/dist/bin/next dev",
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "build:static": "STATIC_EXPORT=true next build",

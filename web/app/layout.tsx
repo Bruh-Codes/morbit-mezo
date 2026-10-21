@@ -9,9 +9,9 @@ import NextTopLoader from 'nextjs-toploader';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Open Source Liquidity Protocol',
+  title: 'Morbit | MUSD Liquidity',
   description:
-    'Morbit is an Open Source Protocol to create Non-Custodial Liquidity Markets for Real World Assets to earn interest on supplying and borrowing assets.',
+    'Explore MUSD liquidity pools, manage positions, and try Simple Earn. Pool metrics and actions are illustrative in this demo.',
   icons: {
     icon: '/icon.svg',
   },
