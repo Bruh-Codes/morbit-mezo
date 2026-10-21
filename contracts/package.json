@@ -4,7 +4,7 @@
   "packageManager": "yarn@4.9.2",
   "scripts": {
     "compile": "hardhat compile",
-    "test": "node --import tsx/esm --test \"test/*.ts\"",
+    "test": "hardhat compile && node --import tsx/esm --test \"test/*.ts\"",
     "deploy:mezo": "hardhat run scripts/deploy-mezo.js --network mezoTestnet",
     "smoke:mezo": "hardhat run scripts/smoke-mezo.js --network mezoTestnet"
   },
