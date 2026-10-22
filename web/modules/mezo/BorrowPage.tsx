@@ -34,6 +34,8 @@ import {
 const WAD = 10n ** 18n;
 // Leave room for gas when the user picks Max on native BTC.
 const GAS_RESERVE = 10n ** 14n;
+// "Safe max" borrows down to a 200% collateral ratio.
+const SAFE_RATIO = 2n * 10n ** 18n;
 
 function ratioColor(ratio?: bigint) {
   if (ratio === undefined) return 'text.primary';
@@ -170,6 +172,12 @@ function OpenTrove({
     position.btcBalance !== undefined && position.btcBalance > GAS_RESERVE
       ? position.btcBalance - GAS_RESERVE
       : 0n;
+  // Largest borrow that keeps the trove at SAFE_RATIO after the fee and reserve.
+  const safeDebt = (() => {
+    if (!system.btcPrice || system.borrowingRate === undefined) return 0n;
+    const room = (((coll * system.btcPrice) / WAD) * WAD) / SAFE_RATIO - MUSD_GAS_COMPENSATION;
+    return room > 0n ? (room * WAD) / (WAD + system.borrowingRate) : 0n;
+  })();
 
   const error = useMemo(() => {
     if (coll === 0n && debt === 0n) return undefined;
@@ -213,11 +221,20 @@ function OpenTrove({
           balance={position.btcBalance}
           onMax={() => setCollText(fmtPlain(maxBtc))}
         />
-        <AmountField label="Borrow" symbol="MUSD" value={debtText} onChange={setDebtText} />
+        <AmountField
+          label="Borrow"
+          symbol="MUSD"
+          value={debtText}
+          onChange={setDebtText}
+          onMax={coll && safeDebt > 0n ? () => setDebtText(fmtPlain(safeDebt)) : undefined}
+          maxLabel="Safe max"
+        />
         <Box>
-          <Row label="Borrowing fee" value={fmtToken('MUSD', fee, 2)} />
-          <Row label="Refundable reserve" value="200 MUSD" />
-          <Row label="Total debt" value={fmtToken('MUSD', totalDebt, 2)} />
+          <Row
+            label="Total debt"
+            value={fmtToken('MUSD', totalDebt, 2)}
+            hint={debt > 0n ? `Incl. ${fmtAmount(fee, 2)} fee + 200 reserve` : undefined}
+          />
           <Row
             label="Collateral ratio"
             value={

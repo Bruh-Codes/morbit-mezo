@@ -1,13 +1,13 @@
 'use client';
 
-import { OpenInNew } from '@mui/icons-material';
-import { Box, Chip, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { getAbiItem } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 
 import { earnVaultAbi } from './abis';
-import { explorerTx, mezo, MEZO_TESTNET_ID } from './config';
+import { Address } from './Address';
+import { mezo, MEZO_TESTNET_ID } from './config';
 import { fmtAmount, timeAgo } from './format';
 import { useNow } from './hooks';
 import { useTxHistory } from './txHistory';
@@ -157,20 +157,7 @@ function Entry({
         {detail && <Typography color="text.secondary">{detail}</Typography>}
       </Box>
       <Stack alignItems={{ sm: 'flex-end' }} sx={{ flexShrink: 0 }}>
-        <MuiLink
-          href={explorerTx(hash)}
-          target="_blank"
-          rel="noopener"
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 0.5,
-            fontFamily: 'monospace',
-            fontSize: 13,
-          }}
-        >
-          {hash.slice(0, 10)}…{hash.slice(-6)} <OpenInNew sx={{ fontSize: 14 }} />
-        </MuiLink>
+        <Address value={hash} kind="tx" />
         <Typography variant="description" color="text.secondary">
           {meta}
         </Typography>

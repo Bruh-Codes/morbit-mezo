@@ -46,7 +46,8 @@ export function PageTop({
     <Box
       sx={{
         position: 'relative',
-        py: { xs: 4, md: 5 },
+        pt: { xs: 4, md: 5 },
+        pb: { xs: 3, md: 4 },
         mb: 4,
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? theme.palette.background.surface2 : '#E9ECDD',
@@ -236,6 +237,7 @@ export function AmountField({
   balance,
   balanceLabel = 'Wallet',
   onMax,
+  maxLabel = 'Max',
   error,
   disabled,
 }: {
@@ -246,6 +248,7 @@ export function AmountField({
   balance?: bigint;
   balanceLabel?: string;
   onMax?: () => void;
+  maxLabel?: string;
   error?: string;
   disabled?: boolean;
 }) {
@@ -287,7 +290,7 @@ export function AmountField({
                 </Typography>
                 {onMax && (
                   <Button size="small" onClick={onMax} disabled={disabled} sx={{ minWidth: 0 }}>
-                    Max
+                    {maxLabel}
                   </Button>
                 )}
               </Stack>

@@ -6,11 +6,13 @@ import Link from 'next/link';
 
 import { CCR } from './config';
 import { btcValue, fmtAmount, fmtRatio, fmtToken, fmtUsd } from './format';
-import { useMusdSystem } from './hooks';
+import { useMusdSystem, useUserPosition } from './hooks';
+import { NextStep } from './NextStep';
 import { AssetIcon, Metric, MetricRow, PageContainer, PageTop, Panel, Row } from './ui';
 
 export function OverviewPage() {
   const system = useMusdSystem();
+  const position = useUserPosition(system.btcPrice);
   const vault = system.vault;
 
   return (
@@ -39,6 +41,7 @@ export function OverviewPage() {
             Can&apos;t reach Mezo testnet. Refresh to retry.
           </Typography>
         )}
+        <NextStep position={position} />
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
             <ProductCard
@@ -109,7 +112,7 @@ function ProductCard({
         <Button
           component={Link}
           href={href}
-          variant="contained"
+          variant="surface"
           endIcon={<ArrowForward />}
           sx={{ alignSelf: 'flex-start' }}
         >

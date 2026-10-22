@@ -1,10 +1,11 @@
 'use client';
 
 import { ExpandMore } from '@mui/icons-material';
-import { Box, Collapse, Grid, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Box, Collapse, Grid, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
-import { explorerAddress, mezo } from './config';
+import { Address } from './Address';
+import { mezo } from './config';
 
 const CONTRACTS: [string, string | undefined][] = [
   ['MUSD', mezo.musd],
@@ -47,22 +48,15 @@ export function Footer() {
         </Stack>
       </Stack>
       <Collapse in={open}>
-        <Grid container columnSpacing={4} rowSpacing={0.5} sx={{ pt: 1.5 }}>
+        <Grid container columnSpacing={6} sx={{ pt: 1, maxWidth: 900 }}>
           {CONTRACTS.map(([label, address]) => (
             <Grid item xs={12} md={6} key={label}>
-              <Stack direction="row" justifyContent="space-between" gap={2}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
                 <Typography variant="description" color="text.secondary">
                   {label}
                 </Typography>
                 {address ? (
-                  <MuiLink
-                    href={explorerAddress(address)}
-                    target="_blank"
-                    rel="noopener"
-                    sx={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}
-                  >
-                    {address}
-                  </MuiLink>
+                  <Address value={address} />
                 ) : (
                   <Typography variant="description">—</Typography>
                 )}

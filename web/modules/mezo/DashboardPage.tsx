@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi';
 import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition } from './hooks';
+import { NextStep } from './NextStep';
 import {
   AssetIcon,
   ConnectPrompt,
@@ -53,79 +54,82 @@ export function DashboardPage() {
         {!address ? (
           <ConnectPrompt message="Connect a wallet to see your positions." />
         ) : (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Panel title="Wallet">
-                <Row
-                  label={<Label symbol="BTC" />}
-                  value={fmtAmount(position.btcBalance, 6)}
-                  hint={fmtUsd(btcValue(position.btcBalance, system.btcPrice))}
-                />
-                <Row label={<Label symbol="MUSD" />} value={fmtAmount(position.musdBalance, 2)} />
-                <Row label={<Label symbol="MEZO" />} value={fmtAmount(position.mezoBalance, 2)} />
-                {position.btcBalance === 0n && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    <MuiLink href={mezo.faucetUrl} target="_blank" rel="noopener">
-                      Get testnet BTC
-                    </MuiLink>
-                  </Alert>
-                )}
-              </Panel>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Panel
-                title="Trove"
-                action={
-                  <Button component={Link} href="/borrow/" variant="surface" size="small">
-                    {active ? 'Manage' : 'Open'}
-                  </Button>
-                }
-              >
-                {active ? (
-                  <>
-                    <Row
-                      label="Collateral"
-                      value={fmtToken('BTC', troveColl, 6)}
-                      hint={fmtUsd(btcValue(troveColl, system.btcPrice))}
-                    />
-                    <Row label="Debt" value={fmtToken('MUSD', troveDebt, 2)} />
-                    <Row label="Collateral ratio" value={fmtRatio(trove.icr)} />
-                    <Row
-                      label="Liquidation price"
-                      value={fmtUsd(liquidationPrice(troveColl, troveDebt))}
-                    />
-                  </>
-                ) : (
+          <>
+            <NextStep position={position} />
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Panel title="Wallet">
                   <Row
-                    label="Status"
-                    value={
-                      trove.status === TroveStatus.closedByLiquidation
-                        ? 'Liquidated'
-                        : 'No open trove'
-                    }
+                    label={<Label symbol="BTC" />}
+                    value={fmtAmount(position.btcBalance, 6)}
+                    hint={fmtUsd(btcValue(position.btcBalance, system.btcPrice))}
                   />
-                )}
-              </Panel>
+                  <Row label={<Label symbol="MUSD" />} value={fmtAmount(position.musdBalance, 2)} />
+                  <Row label={<Label symbol="MEZO" />} value={fmtAmount(position.mezoBalance, 2)} />
+                  {position.btcBalance === 0n && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <MuiLink href={mezo.faucetUrl} target="_blank" rel="noopener">
+                        Get testnet BTC
+                      </MuiLink>
+                    </Alert>
+                  )}
+                </Panel>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Panel
+                  title="Trove"
+                  action={
+                    <Button component={Link} href="/borrow/" variant="surface" size="small">
+                      {active ? 'Manage' : 'Open'}
+                    </Button>
+                  }
+                >
+                  {active ? (
+                    <>
+                      <Row
+                        label="Collateral"
+                        value={fmtToken('BTC', troveColl, 6)}
+                        hint={fmtUsd(btcValue(troveColl, system.btcPrice))}
+                      />
+                      <Row label="Debt" value={fmtToken('MUSD', troveDebt, 2)} />
+                      <Row label="Collateral ratio" value={fmtRatio(trove.icr)} />
+                      <Row
+                        label="Liquidation price"
+                        value={fmtUsd(liquidationPrice(troveColl, troveDebt))}
+                      />
+                    </>
+                  ) : (
+                    <Row
+                      label="Status"
+                      value={
+                        trove.status === TroveStatus.closedByLiquidation
+                          ? 'Liquidated'
+                          : 'No open trove'
+                      }
+                    />
+                  )}
+                </Panel>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Panel
+                  title="Simple Earn"
+                  action={
+                    <Button component={Link} href="/earn/" variant="surface" size="small">
+                      {vault.shares ? 'Manage' : 'Deposit'}
+                    </Button>
+                  }
+                >
+                  <Row label="Shares" value={fmtToken('mvMUSD', vault.shares, 4)} />
+                  <Row label="Value" value={fmtUsd(vault.value)} />
+                  <Row
+                    label="Withdrawable"
+                    value={fmtToken('MUSD', vault.musdOut, 2)}
+                    hint={`+ ${fmtAmount(vault.btcOut, 8)} BTC`}
+                  />
+                </Panel>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <Panel
-                title="Simple Earn"
-                action={
-                  <Button component={Link} href="/earn/" variant="surface" size="small">
-                    {vault.shares ? 'Manage' : 'Deposit'}
-                  </Button>
-                }
-              >
-                <Row label="Shares" value={fmtToken('mvMUSD', vault.shares, 4)} />
-                <Row label="Value" value={fmtUsd(vault.value)} />
-                <Row
-                  label="Withdrawable"
-                  value={fmtToken('MUSD', vault.musdOut, 2)}
-                  hint={`+ ${fmtAmount(vault.btcOut, 8)} BTC`}
-                />
-              </Panel>
-            </Grid>
-          </Grid>
+          </>
         )}
       </PageContainer>
     </>
