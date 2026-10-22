@@ -8,10 +8,10 @@
   "troveManager": "0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0",
   "borrowerOperations": "0xCdF7028ceAB81fA0C6971208e83fa7872994beE5",
   "priceFeed": "0x86bCF0841622a5dAC14A313a15f96A95421b9366",
-  "stabilityPool": "",
-  "sortedTroves": "",
-  "earnVault": "",
-  "earnVaultDeployBlock": 0,
-  "deployer": null,
-  "deployedAt": null
+  "stabilityPool": "0x1CCA7E410eE41739792eA0A24e00349Dd247680e",
+  "sortedTroves": "0x722E4D24FD6Ff8b0AC679450F3D91294607268fA",
+  "earnVault": "0x8D6444887c22Eb1A32De4299E507C62EbAb4004A",
+  "earnVaultDeployBlock": 16290372,
+  "deployer": "0xd5Ff4A4458BC8d2684A452C0C57531731410F3f4",
+  "deployedAt": "2026-10-22T01:58:53.708Z"
 }
