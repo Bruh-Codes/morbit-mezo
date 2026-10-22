@@ -13,9 +13,9 @@ import { MEZO_TESTNET_ID } from './config';
 
 const NAV = [
   { href: '/', label: 'Overview' },
-  { href: '/borrow/', label: 'Borrow' },
-  { href: '/earn/', label: 'Simple Earn' },
   { href: '/dashboard/', label: 'Dashboard' },
+  { href: '/borrow/', label: 'Borrow' },
+  { href: '/earn/', label: 'Earn' },
   { href: '/history/', label: 'Activity' },
 ];
 
@@ -54,7 +54,7 @@ export function Header() {
         <Stack
           component="nav"
           direction="row"
-          sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5 }}
+          sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, ml: 2 }}
         >
           {NAV.map((item) => (
             <NavLink
