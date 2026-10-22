@@ -48,9 +48,9 @@ export function Footer() {
         </Stack>
       </Stack>
       <Collapse in={open}>
-        <Grid container columnSpacing={6} sx={{ pt: 1, maxWidth: 900 }}>
+        <Grid container columnSpacing={6} sx={{ pt: 1 }}>
           {CONTRACTS.map(([label, address]) => (
-            <Grid item xs={12} md={6} key={label}>
+            <Grid item xs={12} sm={6} md={4} key={label}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
                 <Typography variant="description" color="text.secondary">
                   {label}

@@ -38,7 +38,7 @@ export function EarnPage() {
             label="Vault value"
             value={fmtUsd(vault?.totalAssets)}
             hint={
-              vault
+              vault?.totalMusd !== undefined
                 ? `${fmtAmount(vault.totalMusd, 2)} MUSD + ${fmtAmount(vault.totalBtc, 6)} BTC`
                 : undefined
             }
