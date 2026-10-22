@@ -5,7 +5,7 @@ import { Box, Button, Grid, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 
 import { CCR } from './config';
-import { btcValue, fmtAmount, fmtRatio, fmtToken, fmtUsd } from './format';
+import { btcValue, fmtRatio, fmtToken, fmtUsd } from './format';
 import { useMusdSystem, useUserPosition } from './hooks';
 import { INFO } from './info';
 import { NextStep } from './NextStep';
@@ -30,7 +30,7 @@ export function OverviewPage() {
             loading={system.isLoading}
             label="Total borrowed"
             info={INFO['Total borrowed']}
-            value={fmtAmount(system.systemDebt, 0)}
+            value={fmtToken('MUSD', system.systemDebt, 0)}
           />
           <Metric
             loading={system.isLoading}

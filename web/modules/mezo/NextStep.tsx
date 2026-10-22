@@ -24,7 +24,9 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
     };
   if (!hasTrove) return { title: 'Borrow MUSD with your BTC', cta: 'Borrow', href: '/borrow/' };
   if (mezo.earnVault && (musdBalance ?? 0n) > 0n)
-    return { title: 'Put your MUSD to work', cta: 'Deposit', href: '/earn/' };
+    return (vault.shares ?? 0n) > 0n
+      ? { title: 'Add your idle MUSD to Simple Earn', cta: 'Deposit more', href: '/earn/' }
+      : { title: 'Put your MUSD to work', cta: 'Deposit', href: '/earn/' };
   if ((vault.shares ?? 0n) > 0n)
     return { title: 'Track your positions', cta: 'Dashboard', href: '/dashboard/' };
   return { title: 'Manage your loan', cta: 'Manage', href: '/borrow/' };

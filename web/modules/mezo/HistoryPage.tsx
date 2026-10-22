@@ -64,7 +64,7 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
           ...deposits.map((log) => ({
             hash: log.transactionHash,
             product: 'Earn' as const,
-            title: 'Deposited MUSD',
+            title: 'Deposited',
             detail: `${fmtAmount(log.args.assets, 2)} MUSD → ${fmtAmount(
               log.args.shares,
               4
