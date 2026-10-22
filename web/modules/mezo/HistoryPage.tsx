@@ -23,7 +23,9 @@ type ChainEvent = {
 
 // Mezo's RPC rejects log queries wider than 10,000 blocks, so history is read in chunks.
 const CHUNK = 10_000n;
-const TROVE_LOOKBACK = 300_000n;
+// Recent trove history only; older trove actions sent from Morbit are also kept locally.
+const TROVE_LOOKBACK = 60_000n;
+const PARALLEL = 10;
 
 /** Split [from, to] into RPC-sized ranges, newest first. */
 function ranges(from: bigint, to: bigint) {
@@ -44,18 +46,19 @@ async function chunked<T>(
 ): Promise<T[]> {
   const parts = ranges(from, to);
   const results: T[] = [];
-  for (let i = 0; i < parts.length; i += 6) {
-    const batch = await Promise.all(parts.slice(i, i + 6).map(([a, b]) => query(a, b)));
+  for (let i = 0; i < parts.length; i += PARALLEL) {
+    const batch = await Promise.all(parts.slice(i, i + PARALLEL).map(([a, b]) => query(a, b)));
     batch.forEach((r) => results.push(...r));
   }
   return results;
 }
 const TROVE_OPS = ['Opened trove', 'Closed trove', 'Adjusted trove', 'Refinanced trove'];
 
-function useChainEvents(account?: `0x${string}`) {
+// Vault and trove history load separately so the fast one shows first.
+function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
   const client = usePublicClient({ chainId: MEZO_TESTNET_ID });
   return useQuery({
-    queryKey: ['account-events', account],
+    queryKey: ['account-events', kind, account],
     enabled: !!client && !!account,
     refetchInterval: 60_000,
     queryFn: async (): Promise<ChainEvent[]> => {
@@ -131,9 +134,7 @@ function useChainEvents(account?: `0x${string}`) {
         });
       };
 
-      // Trove history is best effort; vault history still shows if it fails.
-      const [vault, trove] = await Promise.all([vaultEvents(), troveEvents().catch(() => [])]);
-      return [...vault, ...trove].sort((a, b) => Number(b.block - a.block));
+      return kind === 'vault' ? vaultEvents() : troveEvents();
     },
   });
 }
@@ -141,7 +142,15 @@ function useChainEvents(account?: `0x${string}`) {
 export function HistoryPage() {
   const { address } = useAccount();
   const local = useTxHistory(address);
-  const events = useChainEvents(address);
+  const vaultEvents = useChainEvents('vault', address);
+  const troveEvents = useChainEvents('trove', address);
+  const events = {
+    isLoading: vaultEvents.isLoading && troveEvents.isLoading,
+    isError: vaultEvents.isError || troveEvents.isError,
+    data: [...(vaultEvents.data ?? []), ...(troveEvents.data ?? [])].sort((a, b) =>
+      Number(b.block - a.block)
+    ),
+  };
   const now = useNow();
 
   // Transactions sent from this browser that are not indexed yet (pending or just confirmed).
