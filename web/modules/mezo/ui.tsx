@@ -185,13 +185,15 @@ export function Row({
     <Stack
       direction="row"
       justifyContent="space-between"
-      alignItems="baseline"
+      alignItems="flex-start"
       gap={2}
       sx={{ py: 1 }}
     >
-      <Typography color="text.secondary">{label}</Typography>
+      <Typography color="text.secondary" component="div" sx={{ lineHeight: '24px' }}>
+        {label}
+      </Typography>
       <Box sx={{ textAlign: 'right' }}>
-        <Typography fontWeight={700} component="div">
+        <Typography fontWeight={700} component="div" sx={{ lineHeight: '24px' }}>
           {value}
         </Typography>
         {hint && (

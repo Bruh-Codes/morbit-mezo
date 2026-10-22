@@ -124,7 +124,7 @@ export function DashboardPage() {
                   <Row
                     label="Withdrawable"
                     value={fmtToken('MUSD', vault.musdOut, 2)}
-                    hint={`+ ${fmtAmount(vault.btcOut, 8)} BTC`}
+                    hint={vault.btcOut ? `+ ${fmtAmount(vault.btcOut, 8)} BTC` : undefined}
                   />
                 </Panel>
               </Grid>
