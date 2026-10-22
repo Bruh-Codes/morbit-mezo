@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Box, Grid, Link as MuiLink, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { maxUint256 } from 'viem';
 import { useAccount } from 'wagmi';
 
@@ -96,6 +96,10 @@ function VaultActions({
   position: ReturnType<typeof useUserPosition>;
 }) {
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
+  // Dashboard buttons link here with ?tab=withdraw.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'withdraw') setTab('withdraw');
+  }, []);
   return (
     <Panel>
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>

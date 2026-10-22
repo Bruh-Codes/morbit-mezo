@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Box, Divider, Grid, Link as MuiLink, Stack, Tab, Tabs } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 import { borrowerOperationsAbi } from './abis';
@@ -287,6 +287,7 @@ function OpenTrove({
 }
 
 type Action = 'addColl' | 'withdrawColl' | 'borrow' | 'repay' | 'close';
+const ACTIONS: Action[] = ['addColl', 'withdrawColl', 'borrow', 'repay', 'close'];
 
 function ManageTrove({
   system,
@@ -296,6 +297,11 @@ function ManageTrove({
   position: ReturnType<typeof useUserPosition>;
 }) {
   const [action, setAction] = useState<Action>('addColl');
+  // Dashboard buttons link here with ?action=repay etc.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('action');
+    if (requested && ACTIONS.includes(requested as Action)) setAction(requested as Action);
+  }, []);
   const [text, setText] = useState('');
   const hints = useTroveHints();
   const tx = useMezoTx(() => {
