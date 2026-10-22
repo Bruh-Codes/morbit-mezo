@@ -21,8 +21,35 @@ type ChainEvent = {
   block: bigint;
 };
 
-// How far back to look for trove events. Some RPCs cap log ranges, so retry with less.
-const TROVE_LOOKBACK = [500_000n, 50_000n];
+// Mezo's RPC rejects log queries wider than 10,000 blocks, so history is read in chunks.
+const CHUNK = 10_000n;
+const TROVE_LOOKBACK = 300_000n;
+
+/** Split [from, to] into RPC-sized ranges, newest first. */
+function ranges(from: bigint, to: bigint) {
+  const out: [bigint, bigint][] = [];
+  for (let end = to; end >= from; end -= CHUNK) {
+    const start = end - CHUNK + 1n > from ? end - CHUNK + 1n : from;
+    out.push([start, end]);
+    if (start === from) break;
+  }
+  return out;
+}
+
+/** Run chunked queries a few at a time and flatten the results. */
+async function chunked<T>(
+  from: bigint,
+  to: bigint,
+  query: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>
+): Promise<T[]> {
+  const parts = ranges(from, to);
+  const results: T[] = [];
+  for (let i = 0; i < parts.length; i += 6) {
+    const batch = await Promise.all(parts.slice(i, i + 6).map(([a, b]) => query(a, b)));
+    batch.forEach((r) => results.push(...r));
+  }
+  return results;
+}
 const TROVE_OPS = ['Opened trove', 'Closed trove', 'Adjusted trove', 'Refinanced trove'];
 
 function useChainEvents(account?: `0x${string}`) {
@@ -30,26 +57,32 @@ function useChainEvents(account?: `0x${string}`) {
   return useQuery({
     queryKey: ['account-events', account],
     enabled: !!client && !!account,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     queryFn: async (): Promise<ChainEvent[]> => {
       const latest = await client!.getBlockNumber();
 
       const vaultEvents = async (): Promise<ChainEvent[]> => {
         if (!mezo.earnVault) return [];
-        const fromBlock = mezo.earnVaultDeployBlock;
+        const from = mezo.earnVaultDeployBlock;
         const [deposits, withdrawals] = await Promise.all([
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
-            args: { receiver: account },
-            fromBlock,
-          }),
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
-            args: { owner: account },
-            fromBlock,
-          }),
+          chunked(from, latest, (fromBlock, toBlock) =>
+            client!.getLogs({
+              address: mezo.earnVault,
+              event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
+              args: { receiver: account },
+              fromBlock,
+              toBlock,
+            })
+          ),
+          chunked(from, latest, (fromBlock, toBlock) =>
+            client!.getLogs({
+              address: mezo.earnVault,
+              event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
+              args: { owner: account },
+              fromBlock,
+              toBlock,
+            })
+          ),
         ]);
         return [
           ...deposits.map((log) => ({
@@ -73,36 +106,33 @@ function useChainEvents(account?: `0x${string}`) {
       };
 
       const troveEvents = async (): Promise<ChainEvent[]> => {
-        for (const lookback of TROVE_LOOKBACK) {
-          try {
-            const logs = await client!.getLogs({
-              address: mezo.borrowerOperations,
-              event: getAbiItem({ abi: borrowerOperationsAbi, name: 'TroveUpdated' }),
-              args: { _borrower: account },
-              fromBlock: latest > lookback ? latest - lookback : 0n,
-              toBlock: latest,
-            });
-            return logs.map((log) => {
-              const debt = (log.args._principal ?? 0n) + (log.args._interest ?? 0n);
-              return {
-                hash: log.transactionHash,
-                product: 'Borrow' as const,
-                title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated trove',
-                detail:
-                  log.args._operation === 1
-                    ? 'Debt repaid, BTC returned'
-                    : `${fmtAmount(log.args._coll, 4)} BTC · ${fmtAmount(debt, 2)} MUSD debt`,
-                block: log.blockNumber,
-              };
-            });
-          } catch {
-            // Range too large for this RPC; try a shorter one.
-          }
-        }
-        return [];
+        const from = latest > TROVE_LOOKBACK ? latest - TROVE_LOOKBACK : 0n;
+        const logs = await chunked(from, latest, (fromBlock, toBlock) =>
+          client!.getLogs({
+            address: mezo.borrowerOperations,
+            event: getAbiItem({ abi: borrowerOperationsAbi, name: 'TroveUpdated' }),
+            args: { _borrower: account },
+            fromBlock,
+            toBlock,
+          })
+        );
+        return logs.map((log) => {
+          const debt = (log.args._principal ?? 0n) + (log.args._interest ?? 0n);
+          return {
+            hash: log.transactionHash,
+            product: 'Borrow' as const,
+            title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated trove',
+            detail:
+              log.args._operation === 1
+                ? 'Debt repaid, BTC returned'
+                : `${fmtAmount(log.args._coll, 4)} BTC · ${fmtAmount(debt, 2)} MUSD debt`,
+            block: log.blockNumber,
+          };
+        });
       };
 
-      const [vault, trove] = await Promise.all([vaultEvents(), troveEvents()]);
+      // Trove history is best effort; vault history still shows if it fails.
+      const [vault, trove] = await Promise.all([vaultEvents(), troveEvents().catch(() => [])]);
       return [...vault, ...trove].sort((a, b) => Number(b.block - a.block));
     },
   });
