@@ -28,14 +28,14 @@ export function OverviewPage() {
           />
           <Metric
             loading={system.isLoading}
-            label="MUSD borrowed"
-            info={INFO['MUSD borrowed']}
+            label="Total borrowed"
+            info={INFO['Total borrowed']}
             value={fmtAmount(system.systemDebt, 0)}
           />
           <Metric
             loading={system.isLoading}
-            label="BTC collateral"
-            info={INFO['BTC collateral']}
+            label="Total BTC locked"
+            info={INFO['Total BTC locked']}
             value={fmtToken('BTC', system.systemColl, 2)}
             hint={fmtUsd(btcValue(system.systemColl, system.btcPrice), true)}
           />
@@ -62,7 +62,7 @@ export function OverviewPage() {
             <ProductCard
               icon="MUSD"
               title="Borrow"
-              body="Lock BTC, mint MUSD."
+              body="Use BTC as collateral to borrow MUSD, a $1 stablecoin."
               href="/borrow/"
               cta="Borrow MUSD"
             >
@@ -83,7 +83,7 @@ export function OverviewPage() {
             <ProductCard
               icon="mvMUSD"
               title="Simple Earn"
-              body="Earn BTC from liquidations with your MUSD."
+              body="Deposit MUSD. Earn BTC when loans get liquidated."
               href="/earn/"
               cta="Deposit MUSD"
             >
@@ -93,8 +93,8 @@ export function OverviewPage() {
                 value={vault ? fmtUsd(vault.totalAssets) : '—'}
               />
               <Row
-                label="mvMUSD price"
-                info={INFO['mvMUSD price']}
+                label="Share price"
+                info={INFO['Share price']}
                 value={
                   vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'
                 }

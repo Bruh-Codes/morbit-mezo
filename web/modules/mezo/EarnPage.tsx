@@ -8,7 +8,7 @@ import { useAccount } from 'wagmi';
 import { earnVaultAbi, erc20Abi } from './abis';
 import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtPlain, fmtUsd, parseAmount } from './format';
-import { useMezoTx, useMusdSystem, useUserPosition } from './hooks';
+import { useMezoTx, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
 import { INFO } from './info';
 import {
   AmountField,
@@ -29,6 +29,7 @@ export function EarnPage() {
   const { address } = useAccount();
   const system = useMusdSystem();
   const position = useUserPosition(system.btcPrice);
+  const deposited = useVaultDeposited(address);
   const vault = system.vault;
 
   return (
@@ -48,8 +49,8 @@ export function EarnPage() {
           />
           <Metric
             loading={system.isLoading}
-            label="mvMUSD price"
-            info={INFO['mvMUSD price']}
+            label="Share price"
+            info={INFO['Share price']}
             value={vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'}
           />
           <Metric
@@ -64,6 +65,15 @@ export function EarnPage() {
               label="Your position"
               info={INFO['Your position']}
               value={fmtUsd(position.vault.value)}
+              hint={
+                deposited.data !== undefined && position.vault.value !== undefined
+                  ? `Deposited ${fmtAmount(deposited.data, 2)} MUSD · Earned ${fmtUsd(
+                      position.vault.value > deposited.data
+                        ? position.vault.value - deposited.data
+                        : 0n
+                    )}`
+                  : undefined
+              }
             />
           )}
         </MetricRow>

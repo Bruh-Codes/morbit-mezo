@@ -9,6 +9,7 @@ import { borrowerOperationsAbi, earnVaultAbi } from './abis';
 import { Address } from './Address';
 import { mezo, MEZO_TESTNET_ID } from './config';
 import { fmtAmount, timeAgo } from './format';
+import { chunked } from './logs';
 import { useNow } from './hooks';
 import { useTxHistory } from './txHistory';
 import { ConnectPrompt, PageContainer, PageTop, Panel } from './ui';
@@ -21,38 +22,10 @@ type ChainEvent = {
   block: bigint;
 };
 
-// Mezo's RPC rejects log queries wider than 10,000 blocks, so history is read in chunks.
-const CHUNK = 10_000n;
 // Recent trove history only; older trove actions sent from Morbit are also kept locally.
 const TROVE_LOOKBACK = 60_000n;
-const PARALLEL = 10;
 
-/** Split [from, to] into RPC-sized ranges, newest first. */
-function ranges(from: bigint, to: bigint) {
-  const out: [bigint, bigint][] = [];
-  for (let end = to; end >= from; end -= CHUNK) {
-    const start = end - CHUNK + 1n > from ? end - CHUNK + 1n : from;
-    out.push([start, end]);
-    if (start === from) break;
-  }
-  return out;
-}
-
-/** Run chunked queries a few at a time and flatten the results. */
-async function chunked<T>(
-  from: bigint,
-  to: bigint,
-  query: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>
-): Promise<T[]> {
-  const parts = ranges(from, to);
-  const results: T[] = [];
-  for (let i = 0; i < parts.length; i += PARALLEL) {
-    const batch = await Promise.all(parts.slice(i, i + PARALLEL).map(([a, b]) => query(a, b)));
-    batch.forEach((r) => results.push(...r));
-  }
-  return results;
-}
-const TROVE_OPS = ['Opened trove', 'Closed trove', 'Adjusted trove', 'Refinanced trove'];
+const TROVE_OPS = ['Opened loan', 'Closed loan', 'Updated loan', 'Refinanced loan'];
 
 // Vault and trove history load separately so the fast one shows first.
 function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
@@ -124,7 +97,7 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
           return {
             hash: log.transactionHash,
             product: 'Borrow' as const,
-            title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated trove',
+            title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated loan',
             detail:
               log.args._operation === 1
                 ? 'Debt repaid, BTC returned'

@@ -116,14 +116,14 @@ function TroveSummary({
   const { trove } = position;
   const active = trove.status === TroveStatus.active;
   const statusText: Record<number, string> = {
-    [TroveStatus.nonExistent]: 'No trove yet',
+    [TroveStatus.nonExistent]: 'No loan yet',
     [TroveStatus.active]: 'Active',
     [TroveStatus.closedByOwner]: 'Closed',
     [TroveStatus.closedByLiquidation]: 'Liquidated',
     [TroveStatus.closedByRedemption]: 'Closed by redemption',
   };
   return (
-    <Panel title="Your trove">
+    <Panel title="Your loan">
       <Row label="Status" value={trove.status === undefined ? '—' : statusText[trove.status]} />
       <Row
         label="Collateral"
@@ -215,7 +215,7 @@ function OpenTrove({
   const submit = async () => {
     const [upper, lower] = await hints(coll, totalDebt);
     const done = await tx.send(
-      'Open trove',
+      'Open loan',
       {
         address: mezo.borrowerOperations,
         abi: borrowerOperationsAbi,
@@ -232,7 +232,7 @@ function OpenTrove({
   };
 
   return (
-    <Panel title="Open a trove">
+    <Panel title="New loan">
       <Stack spacing={2.5}>
         <AmountField
           label="Deposit collateral"
@@ -344,7 +344,7 @@ function ManageTrove({
     if (action === 'addColl' && position.btcBalance !== undefined && amount > position.btcBalance)
       return 'Not enough BTC in your wallet.';
     if (action === 'withdrawColl' && amount >= coll)
-      return 'To take out all collateral, close the trove.';
+      return 'To take out all BTC, repay and close the loan.';
     if (action === 'repay' && position.musdBalance !== undefined && amount > position.musdBalance)
       return 'Not enough MUSD in your wallet.';
     if (
@@ -355,8 +355,9 @@ function ManageTrove({
       return `Debt cannot go below ${fmtAmount(
         system.minNetDebt + MUSD_GAS_COMPENSATION,
         0
-      )} MUSD. Close the trove to repay everything.`;
-    if (nextRatio !== undefined && nextRatio < MCR) return 'This would put the trove below 110%.';
+      )} MUSD. Use Close to repay everything.`;
+    if (nextRatio !== undefined && nextRatio < MCR)
+      return 'This would drop your loan below 110% and risk liquidation.';
     return undefined;
   })();
 
@@ -388,7 +389,7 @@ function ManageTrove({
     let done: boolean;
     if (action === 'close') {
       done = await tx.send(
-        'Close trove',
+        'Close loan',
         {
           address: mezo.borrowerOperations,
           abi: borrowerOperationsAbi,
@@ -431,7 +432,7 @@ function ManageTrove({
         value={text}
         onChange={setText}
         balance={coll}
-        balanceLabel="In trove"
+        balanceLabel="In loan"
       />
     ),
     borrow: <AmountField label="Borrow more" symbol="MUSD" value={text} onChange={setText} />,
@@ -459,7 +460,7 @@ function ManageTrove({
   }[action];
 
   return (
-    <Panel title="Manage trove">
+    <Panel title="Manage loan">
       <Tabs
         value={action}
         onChange={(_, value: Action) => {
@@ -473,7 +474,7 @@ function ManageTrove({
       >
         <Tab value="addColl" label="Add BTC" />
         <Tab value="withdrawColl" label="Withdraw BTC" />
-        <Tab value="borrow" label="Borrow" />
+        <Tab value="borrow" label="Borrow more" />
         <Tab value="repay" label="Repay" />
         <Tab value="close" label="Close" />
       </Tabs>
@@ -519,7 +520,7 @@ function ManageTrove({
               withdrawColl: 'Withdraw collateral',
               borrow: 'Borrow MUSD',
               repay: 'Repay MUSD',
-              close: 'Close trove',
+              close: 'Repay all and close',
             }[action]
           }
         </SubmitButton>

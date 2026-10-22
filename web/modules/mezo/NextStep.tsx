@@ -27,7 +27,7 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
     return { title: 'Put your MUSD to work', cta: 'Deposit', href: '/earn/' };
   if ((vault.shares ?? 0n) > 0n)
     return { title: 'Track your positions', cta: 'Dashboard', href: '/dashboard/' };
-  return { title: 'Manage your trove', cta: 'Manage', href: '/borrow/' };
+  return { title: 'Manage your loan', cta: 'Manage', href: '/borrow/' };
 }
 
 /** One clear next action for the connected wallet. */

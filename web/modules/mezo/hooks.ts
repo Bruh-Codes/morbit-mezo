@@ -1,8 +1,8 @@
 'use client';
 
-import { keepPreviousData } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
-import { type Abi, type Address, type Hash } from 'viem';
+import { type Abi, type Address, getAbiItem, type Hash } from 'viem';
 import {
   useAccount,
   useBalance,
@@ -22,6 +22,7 @@ import {
   troveManagerAbi,
 } from './abis';
 import { mezo, MEZO_TESTNET_ID, ZERO } from './config';
+import { chunked } from './logs';
 import { recordTx, updateTx } from './txHistory';
 
 const chainId = MEZO_TESTNET_ID;
@@ -402,4 +403,67 @@ export function useNow(intervalMs = 30_000) {
     return () => clearInterval(id);
   }, [intervalMs]);
   return now;
+}
+
+/**
+ * MUSD the wallet has put into Simple Earn for the shares it still holds, from vault
+ * Deposit/Withdraw events. Withdrawals reduce it pro rata. Value minus this is earnings.
+ */
+export function useVaultDeposited(account?: Address) {
+  const client = usePublicClient({ chainId });
+  return useQuery({
+    queryKey: ['vault-deposited', account],
+    enabled: !!client && !!account && !!mezo.earnVault,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const latest = await client!.getBlockNumber();
+      const [deposits, withdrawals] = await Promise.all([
+        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
+          client!.getLogs({
+            address: mezo.earnVault,
+            event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
+            args: { receiver: account },
+            fromBlock,
+            toBlock,
+          })
+        ),
+        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
+          client!.getLogs({
+            address: mezo.earnVault,
+            event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
+            args: { owner: account },
+            fromBlock,
+            toBlock,
+          })
+        ),
+      ]);
+      const events = [
+        ...deposits.map((l) => ({
+          order: [l.blockNumber, l.logIndex] as const,
+          shares: l.args.shares ?? 0n,
+          assets: l.args.assets ?? 0n,
+        })),
+        ...withdrawals.map((l) => ({
+          order: [l.blockNumber, l.logIndex] as const,
+          shares: -(l.args.shares ?? 0n),
+          assets: 0n,
+        })),
+      ].sort((a, b) =>
+        a.order[0] === b.order[0] ? a.order[1] - b.order[1] : Number(a.order[0] - b.order[0])
+      );
+      let shares = 0n;
+      let cost = 0n;
+      for (const e of events) {
+        if (e.shares >= 0n) {
+          shares += e.shares;
+          cost += e.assets;
+        } else {
+          const burned = -e.shares;
+          cost = shares > 0n ? cost - (cost * burned) / shares : 0n;
+          shares = shares > burned ? shares - burned : 0n;
+        }
+      }
+      return cost;
+    },
+  });
 }

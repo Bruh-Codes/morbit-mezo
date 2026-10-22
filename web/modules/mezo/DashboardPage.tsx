@@ -20,7 +20,7 @@ import { useAccount } from 'wagmi';
 
 import { CCR, MCR, mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
-import { TroveStatus, useMusdSystem, useUserPosition } from './hooks';
+import { TroveStatus, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
 import { INFO } from './info';
 import { NextStep } from './NextStep';
 import {
@@ -40,6 +40,7 @@ export function DashboardPage() {
   const position = useUserPosition(system.btcPrice);
   const { trove, vault } = position;
   const active = trove.status === TroveStatus.active;
+  const deposited = useVaultDeposited(address);
 
   const troveColl = active ? trove.coll ?? 0n : 0n;
   const troveDebt = active ? trove.debt ?? 0n : 0n;
@@ -88,13 +89,20 @@ export function DashboardPage() {
             <NextStep position={position} />
             <Panel title="Your positions">
               <TableContainer sx={{ overflowX: 'auto' }}>
-                <Table size="small" sx={{ minWidth: 720, '& td, & th': { px: 1.5, py: 1.5 } }}>
+                <Table size="small" sx={{ minWidth: 860, '& td, & th': { px: 1.5, py: 1.5 } }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Position</TableCell>
-                      <TableCell align="right">Supplied</TableCell>
-                      <TableCell align="right">Debt</TableCell>
-                      <TableCell align="right">Value</TableCell>
+                      <TableCell align="right">Deposited</TableCell>
+                      <TableCell align="right">Borrowed</TableCell>
+                      <TableCell align="right">
+                        Value now
+                        <InfoTip text="What the position is worth at today's BTC price. For a loan: collateral minus debt." />
+                      </TableCell>
+                      <TableCell align="right">
+                        Earnings
+                        <InfoTip text="Value now minus what you deposited." />
+                      </TableCell>
                       <TableCell align="right">
                         Health
                         <InfoTip text={INFO['Collateral ratio']} />
@@ -105,7 +113,7 @@ export function DashboardPage() {
                   <TableBody>
                     {position.isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={6}>
+                        <TableCell colSpan={7}>
                           <Skeleton height={40} />
                         </TableCell>
                       </TableRow>
@@ -114,7 +122,7 @@ export function DashboardPage() {
                         {active && (
                           <TableRow>
                             <TableCell>
-                              <Name icon="MUSD" title="MUSD loan" sub="Mezo trove" />
+                              <Name icon="MUSD" title="MUSD loan" sub="BTC collateral" />
                             </TableCell>
                             <TableCell align="right">
                               <Cell
@@ -132,8 +140,11 @@ export function DashboardPage() {
                                     ? (btcValue(troveColl, system.btcPrice) ?? 0n) - troveDebt
                                     : undefined
                                 )}
-                                sub="Equity"
+                                sub="Collateral − debt"
                               />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell main="—" />
                             </TableCell>
                             <TableCell align="right">
                               <Cell
@@ -159,10 +170,21 @@ export function DashboardPage() {
                         {!!vault.shares && (
                           <TableRow>
                             <TableCell>
-                              <Name icon="mvMUSD" title="Simple Earn" sub="MUSD Stability Pool" />
+                              <Name
+                                icon="mvMUSD"
+                                title="Simple Earn"
+                                sub="Earns BTC from liquidations"
+                              />
                             </TableCell>
                             <TableCell align="right">
-                              <Cell main={fmtToken('mvMUSD', vault.shares, 2)} />
+                              <Cell
+                                main={
+                                  deposited.data !== undefined
+                                    ? fmtToken('MUSD', deposited.data, 2)
+                                    : '…'
+                                }
+                                sub={`${fmtAmount(vault.shares, 2)} shares`}
+                              />
                             </TableCell>
                             <TableCell align="right">
                               <Cell main="—" />
@@ -181,6 +203,11 @@ export function DashboardPage() {
                               />
                             </TableCell>
                             <TableCell align="right">
+                              <Cell
+                                main={<Earnings value={vault.value} deposited={deposited.data} />}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
                               <Cell main="—" />
                             </TableCell>
                             <TableCell align="right">
@@ -195,10 +222,10 @@ export function DashboardPage() {
                         )}
                         {!active && !vault.shares && (
                           <TableRow>
-                            <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
+                            <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                               <Typography color="text.secondary" sx={{ mb: 1.5 }}>
                                 {trove.status === TroveStatus.closedByLiquidation
-                                  ? 'Your trove was liquidated. No open positions.'
+                                  ? 'Your loan was liquidated. No open positions.'
                                   : 'No open positions yet.'}
                               </Typography>
                               <Actions
@@ -313,5 +340,19 @@ function Actions({ items, center }: { items: [string, string][]; center?: boolea
         </Button>
       ))}
     </Stack>
+  );
+}
+
+function Earnings({ value, deposited }: { value?: bigint; deposited?: bigint }) {
+  if (value === undefined || deposited === undefined) return <>…</>;
+  const diff = value - deposited;
+  return (
+    <Box
+      component="span"
+      sx={{ color: diff > 0n ? 'success.main' : diff < 0n ? 'error.main' : 'text.primary' }}
+    >
+      {diff >= 0n ? '+' : '−'}
+      {fmtUsd(diff >= 0n ? diff : -diff)}
+    </Box>
   );
 }
