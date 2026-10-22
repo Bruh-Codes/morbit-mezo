@@ -51,7 +51,7 @@ export function EarnPage() {
             label="Stability Pool"
             value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
           />
-          <Metric label="Your position" value={address ? fmtUsd(position.vault.value) : '—'} />
+          {address && <Metric label="Your position" value={fmtUsd(position.vault.value)} />}
         </MetricRow>
       </PageTop>
       <PageContainer>
