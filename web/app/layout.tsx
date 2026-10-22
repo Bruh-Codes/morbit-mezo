@@ -12,9 +12,6 @@ export const metadata: Metadata = {
   title: 'Morbit | Borrow and earn with MUSD on Mezo',
   description:
     'Borrow MUSD against BTC and earn with it through the Morbit Simple Earn vault, live on Mezo testnet.',
-  icons: {
-    icon: '/icon.svg',
-  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { DarkModeOutlined, LightModeOutlined } from '@mui/icons-material';
-import { Box, Button, IconButton, Stack, Tooltip, useTheme } from '@mui/material';
+import { Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from '@mui/material';
 import { ConnectKitButton } from 'connectkit';
 import { ColorModeContext } from 'layouts/AppGlobalStyles';
 import Link from 'next/link';
@@ -47,9 +47,17 @@ export function Header() {
           component={Link}
           href="/"
           aria-label="Morbit home"
-          sx={{ lineHeight: 0, '&:hover': { opacity: 0.7 } }}
+          sx={{ lineHeight: 0, textDecoration: 'none', '&:hover': { opacity: 0.8 } }}
         >
-          <img src="/icon.svg" alt="Morbit" width={72} height={40} />
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <img src="/logo.png" alt="" width={34} height={34} />
+            <Typography
+              component="span"
+              sx={{ fontWeight: 800, fontSize: 18, color: 'text.primary' }}
+            >
+              Morbit
+            </Typography>
+          </Stack>
         </Box>
         <Stack
           component="nav"
