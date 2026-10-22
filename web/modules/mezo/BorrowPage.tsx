@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Box, Divider, Grid, Link as MuiLink, Stack, Tab, Tabs } from '@mui/material';
+import { Alert, Box, Button, Divider, Grid, Link as MuiLink, Stack, Tab, Tabs } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
@@ -308,6 +308,11 @@ function ManageTrove({
     position.refetch();
     system.refetch();
   });
+  const switchTo = (value: Action) => {
+    setAction(value);
+    setText('');
+    tx.reset();
+  };
 
   const coll = position.trove.coll ?? 0n;
   const debt = position.trove.debt ?? 0n;
@@ -334,10 +339,10 @@ function ManageTrove({
   const error = (() => {
     if (action === 'close') {
       if (position.musdBalance !== undefined && position.musdBalance < repayable)
-        return `Closing burns ${fmtAmount(repayable, 2)} MUSD. You hold ${fmtAmount(
+        return `You need ${fmtAmount(repayable, 2)} MUSD to close and hold ${fmtAmount(
           position.musdBalance,
           2
-        )}.`;
+        )}.${position.vault.shares ? ' Withdraw from Simple Earn first.' : ''}`;
       return undefined;
     }
     if (amount === 0n) return undefined;
@@ -355,7 +360,7 @@ function ManageTrove({
       return `Debt cannot go below ${fmtAmount(
         system.minNetDebt + MUSD_GAS_COMPENSATION,
         0
-      )} MUSD. Use Close to repay everything.`;
+      )} MUSD. To repay everything, close the loan.`;
     if (nextRatio !== undefined && nextRatio < MCR)
       return 'This would drop your loan below 110% and risk liquidation.';
     return undefined;
@@ -437,20 +442,33 @@ function ManageTrove({
     ),
     borrow: <AmountField label="Borrow more" symbol="MUSD" value={text} onChange={setText} />,
     repay: (
-      <AmountField
-        label="Repay"
-        symbol="MUSD"
-        value={text}
-        onChange={setText}
-        balance={position.musdBalance}
-        onMax={() => {
-          const floor =
-            system.minNetDebt !== undefined ? system.minNetDebt + MUSD_GAS_COMPENSATION : debt;
-          const room = debt > floor ? debt - floor : 0n;
-          const bal = position.musdBalance ?? 0n;
-          setText(fmtPlain(bal < room ? bal : room));
-        }}
-      />
+      <>
+        <AmountField
+          label="Repay part"
+          symbol="MUSD"
+          value={text}
+          onChange={setText}
+          balance={position.musdBalance}
+          onMax={() => {
+            const floor =
+              system.minNetDebt !== undefined ? system.minNetDebt + MUSD_GAS_COMPENSATION : debt;
+            const room = debt > floor ? debt - floor : 0n;
+            const bal = position.musdBalance ?? 0n;
+            setText(fmtPlain(bal < room ? bal : room));
+          }}
+        />
+        <Alert
+          severity="info"
+          action={
+            <Button color="inherit" size="small" onClick={() => switchTo('close')}>
+              Close loan
+            </Button>
+          }
+        >
+          The loan stays open while it has debt. To repay everything and get your BTC back, close
+          it.
+        </Alert>
+      </>
     ),
     close: (
       <Alert severity="info">
@@ -463,11 +481,7 @@ function ManageTrove({
     <Panel title="Manage loan">
       <Tabs
         value={action}
-        onChange={(_, value: Action) => {
-          setAction(value);
-          setText('');
-          tx.reset();
-        }}
+        onChange={(_, value: Action) => switchTo(value)}
         variant="scrollable"
         allowScrollButtonsMobile
         sx={{ mb: 3 }}
@@ -476,7 +490,7 @@ function ManageTrove({
         <Tab value="withdrawColl" label="Withdraw BTC" />
         <Tab value="borrow" label="Borrow more" />
         <Tab value="repay" label="Repay" />
-        <Tab value="close" label="Close" />
+        <Tab value="close" label="Close loan" />
       </Tabs>
       <Stack spacing={2.5}>
         {field}

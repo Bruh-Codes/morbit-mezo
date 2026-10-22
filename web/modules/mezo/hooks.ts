@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { type Abi, type Address, getAbiItem, type Hash } from 'viem';
 import {
@@ -348,6 +348,7 @@ export function useMezoTx(onDone?: () => void) {
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const client = usePublicClient({ chainId });
+  const queryClient = useQueryClient();
   const [state, setState] = useState<TxState>({ status: 'idle' });
 
   const send = useCallback(
@@ -374,6 +375,10 @@ export function useMezoTx(onDone?: () => void) {
             ? { status: 'success', hash }
             : { status: 'error', hash, error: 'Transaction reverted on chain.' }
         );
+        // Every balance, loan, vault, stat and history query can change after a write.
+        // Refresh all of them now, and once more in case the RPC node lags a block behind.
+        queryClient.invalidateQueries();
+        setTimeout(() => queryClient.invalidateQueries(), 4_000);
         onDone?.();
         return success;
       } catch (error) {
@@ -381,7 +386,7 @@ export function useMezoTx(onDone?: () => void) {
         return false;
       }
     },
-    [walletChain, switchChainAsync, writeContractAsync, client, address, onDone]
+    [walletChain, switchChainAsync, writeContractAsync, client, queryClient, address, onDone]
   );
 
   const reset = useCallback(() => setState({ status: 'idle' }), []);

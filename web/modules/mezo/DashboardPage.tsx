@@ -162,6 +162,7 @@ export function DashboardPage() {
                                   ['Repay', '/borrow/?action=repay'],
                                   ['Add BTC', '/borrow/?action=addColl'],
                                   ['Borrow more', '/borrow/?action=borrow'],
+                                  ['Close', '/borrow/?action=close'],
                                 ]}
                               />
                             </TableCell>
