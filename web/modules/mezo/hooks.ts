@@ -1,5 +1,6 @@
 'use client';
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { type Abi, type Address, type Hash } from 'viem';
 import {
@@ -74,26 +75,11 @@ export type MusdSystem = {
 /** Live MUSD protocol state on Mezo testnet. */
 export function useMusdSystem(): MusdSystem {
   const { stabilityPool } = useMusdAddresses();
-  const priceQuery = useReadContracts({
-    allowFailure: true,
-    contracts: [
-      { address: mezo.priceFeed, abi: priceFeedAbi, functionName: 'fetchPrice', chainId },
-    ],
-    query: { refetchInterval: REFRESH_MS },
-  });
-  const btcPrice = ok<bigint>(priceQuery.data?.[0]);
-
   const vault = mezo.earnVault;
   const { data, isLoading, isError, refetch } = useReadContracts({
     allowFailure: true,
     contracts: [
-      {
-        address: mezo.troveManager,
-        abi: troveManagerAbi,
-        functionName: 'getTCR',
-        args: [btcPrice ?? 0n],
-        chainId,
-      },
+      { address: mezo.priceFeed, abi: priceFeedAbi, functionName: 'fetchPrice', chainId },
       {
         address: mezo.troveManager,
         abi: troveManagerAbi,
@@ -138,14 +124,25 @@ export function useMusdSystem(): MusdSystem {
       { address: vault ?? ZERO, abi: earnVaultAbi, functionName: 'maxDeposit', chainId },
       { address: vault ?? ZERO, abi: earnVaultAbi, functionName: 'depositsPaused', chainId },
     ],
-    query: { enabled: btcPrice !== undefined && !!stabilityPool, refetchInterval: REFRESH_MS },
+    query: {
+      enabled: !!stabilityPool,
+      refetchInterval: REFRESH_MS,
+      placeholderData: keepPreviousData,
+    },
   });
 
+  const btcPrice = ok<bigint>(data?.[0]);
+  const systemColl = ok<bigint>(data?.[1]);
+  const systemDebt = ok<bigint>(data?.[2]);
   return {
     btcPrice,
-    tcr: ok(data?.[0]),
-    systemColl: ok(data?.[1]),
-    systemDebt: ok(data?.[2]),
+    // Same formula as TroveManager.getTCR, computed here so all reads go out in one batch.
+    tcr:
+      btcPrice !== undefined && systemColl !== undefined && systemDebt
+        ? (systemColl * btcPrice) / systemDebt
+        : undefined,
+    systemColl,
+    systemDebt,
     minNetDebt: ok(data?.[3]),
     borrowingRate: ok(data?.[4]),
     stabilityPoolDeposits: ok(data?.[5]),
@@ -161,12 +158,9 @@ export function useMusdSystem(): MusdSystem {
           depositsPaused: ok(data?.[13]),
         }
       : undefined,
-    isLoading: priceQuery.isLoading || isLoading,
-    isError: priceQuery.isError || isError,
-    refetch: () => {
-      priceQuery.refetch();
-      refetch();
-    },
+    isLoading,
+    isError,
+    refetch,
   };
 }
 
@@ -242,23 +236,16 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
       {
         address: mezo.troveManager,
         abi: troveManagerAbi,
-        functionName: 'getCurrentICR',
-        args: [user, btcPrice ?? 0n],
-        chainId,
-      },
-      {
-        address: mezo.troveManager,
-        abi: troveManagerAbi,
         functionName: 'getTroveInterestRate',
         args: [user],
         chainId,
       },
       { address: vault, abi: earnVaultAbi, functionName: 'balanceOf', args: [user], chainId },
     ],
-    query: { enabled: !!address, refetchInterval: REFRESH_MS },
+    query: { enabled: !!address, refetchInterval: REFRESH_MS, placeholderData: keepPreviousData },
   });
 
-  const shares = mezo.earnVault ? ok<bigint>(data?.[8]) : undefined;
+  const shares = mezo.earnVault ? ok<bigint>(data?.[7]) : undefined;
   const preview = useReadContracts({
     allowFailure: true,
     contracts: [
@@ -277,10 +264,16 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
         chainId,
       },
     ],
-    query: { enabled: !!address && !!mezo.earnVault && !!shares, refetchInterval: REFRESH_MS },
+    query: {
+      enabled: !!address && !!mezo.earnVault && !!shares,
+      refetchInterval: REFRESH_MS,
+      placeholderData: keepPreviousData,
+    },
   });
   const redeem = ok<readonly [bigint, bigint]>(preview.data?.[1]);
 
+  const coll = ok<bigint>(data?.[4]);
+  const debt = ok<bigint>(data?.[5]);
   return {
     btcBalance: btc.data?.value,
     musdBalance: ok(data?.[0]),
@@ -288,10 +281,11 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
     musdAllowanceVault: ok(data?.[2]),
     trove: {
       status: ok<number>(data?.[3]) as TroveStatus | undefined,
-      coll: ok(data?.[4]),
-      debt: ok(data?.[5]),
-      icr: btcPrice ? ok(data?.[6]) : undefined,
-      interestRate: ok<number>(data?.[7]),
+      coll,
+      debt,
+      icr:
+        btcPrice !== undefined && coll !== undefined && debt ? (coll * btcPrice) / debt : undefined,
+      interestRate: ok<number>(data?.[6]),
     },
     vault: {
       shares,

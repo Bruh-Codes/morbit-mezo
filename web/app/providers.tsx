@@ -10,7 +10,11 @@ import { wagmiConfig } from '../ui-config/wagmiConfig';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } })
+    () =>
+      new QueryClient({
+        // Keep chain reads fresh for 10s so switching pages shows cached numbers instantly.
+        defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 10_000 } },
+      })
   );
 
   return (

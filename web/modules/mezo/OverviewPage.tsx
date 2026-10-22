@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { CCR } from './config';
 import { btcValue, fmtAmount, fmtRatio, fmtToken, fmtUsd } from './format';
 import { useMusdSystem, useUserPosition } from './hooks';
+import { INFO } from './info';
 import { NextStep } from './NextStep';
 import { AssetIcon, Metric, MetricRow, PageContainer, PageTop, Panel, Row } from './ui';
 
@@ -19,15 +20,29 @@ export function OverviewPage() {
     <>
       <PageTop title="Borrow MUSD against BTC. Earn with it.">
         <MetricRow>
-          <Metric label="BTC price" value={fmtUsd(system.btcPrice)} />
-          <Metric label="MUSD borrowed" value={fmtAmount(system.systemDebt, 0)} />
           <Metric
+            loading={system.isLoading}
+            label="BTC price"
+            info={INFO['BTC price']}
+            value={fmtUsd(system.btcPrice)}
+          />
+          <Metric
+            loading={system.isLoading}
+            label="MUSD borrowed"
+            info={INFO['MUSD borrowed']}
+            value={fmtAmount(system.systemDebt, 0)}
+          />
+          <Metric
+            loading={system.isLoading}
             label="BTC collateral"
+            info={INFO['BTC collateral']}
             value={fmtToken('BTC', system.systemColl, 2)}
             hint={fmtUsd(btcValue(system.systemColl, system.btcPrice), true)}
           />
           <Metric
+            loading={system.isLoading}
             label="System ratio"
+            info={INFO['System ratio']}
             value={fmtRatio(system.tcr)}
             hint={
               system.tcr === undefined ? undefined : system.tcr < CCR ? 'Recovery mode' : undefined
@@ -51,9 +66,17 @@ export function OverviewPage() {
               href="/borrow/"
               cta="Borrow MUSD"
             >
-              <Row label="Minimum debt" value={fmtToken('MUSD', system.minNetDebt, 0)} />
-              <Row label="Borrowing fee" value={fmtRatio(system.borrowingRate, 2)} />
-              <Row label="Liquidation at" value="110%" />
+              <Row
+                label="Minimum debt"
+                info={INFO['Minimum debt']}
+                value={fmtToken('MUSD', system.minNetDebt, 0)}
+              />
+              <Row
+                label="Borrowing fee"
+                info={INFO['Borrowing fee']}
+                value={fmtRatio(system.borrowingRate, 2)}
+              />
+              <Row label="Liquidation at" info={INFO['Liquidation at']} value="110%" />
             </ProductCard>
           </Grid>
           <Grid item xs={12} md={6}>
@@ -64,15 +87,21 @@ export function OverviewPage() {
               href="/earn/"
               cta="Deposit MUSD"
             >
-              <Row label="Vault value" value={vault ? fmtUsd(vault.totalAssets) : '—'} />
+              <Row
+                label="Vault value"
+                info={INFO['Vault value']}
+                value={vault ? fmtUsd(vault.totalAssets) : '—'}
+              />
               <Row
                 label="mvMUSD price"
+                info={INFO['mvMUSD price']}
                 value={
                   vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'
                 }
               />
               <Row
                 label="Stability Pool"
+                info={INFO['Stability Pool']}
                 value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
               />
             </ProductCard>

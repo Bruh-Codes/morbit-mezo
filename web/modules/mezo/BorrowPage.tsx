@@ -18,6 +18,7 @@ import {
   parseAmount,
 } from './format';
 import { TroveStatus, useMezoTx, useMusdSystem, useTroveHints, useUserPosition } from './hooks';
+import { INFO } from './info';
 import {
   AmountField,
   ConnectPrompt,
@@ -54,11 +55,28 @@ export function BorrowPage() {
     <>
       <PageTop title="Borrow">
         <MetricRow>
-          <Metric label="BTC price" value={fmtUsd(system.btcPrice)} />
-          <Metric label="Minimum debt" value={fmtToken('MUSD', system.minNetDebt, 0)} />
-          <Metric label="Borrowing fee" value={fmtRatio(system.borrowingRate, 2)} />
           <Metric
+            loading={system.isLoading}
+            label="BTC price"
+            info={INFO['BTC price']}
+            value={fmtUsd(system.btcPrice)}
+          />
+          <Metric
+            loading={system.isLoading}
+            label="Minimum debt"
+            info={INFO['Minimum debt']}
+            value={fmtToken('MUSD', system.minNetDebt, 0)}
+          />
+          <Metric
+            loading={system.isLoading}
+            label="Borrowing fee"
+            info={INFO['Borrowing fee']}
+            value={fmtRatio(system.borrowingRate, 2)}
+          />
+          <Metric
+            loading={system.isLoading}
             label="System ratio"
+            info={INFO['System ratio']}
             value={fmtRatio(system.tcr)}
             hint={system.tcr !== undefined && system.tcr < CCR ? 'Recovery mode' : undefined}
           />
@@ -115,6 +133,7 @@ function TroveSummary({
       <Row label="Debt" value={fmtToken('MUSD', active ? trove.debt : 0n, 2)} />
       <Row
         label="Collateral ratio"
+        info={INFO['Collateral ratio']}
         value={
           <Box component="span" sx={{ color: ratioColor(active ? trove.icr : undefined) }}>
             {active ? fmtRatio(trove.icr) : '—'}
@@ -123,10 +142,12 @@ function TroveSummary({
       />
       <Row
         label="Liquidation price"
+        info={INFO['Liquidation price']}
         value={active ? fmtUsd(liquidationPrice(trove.coll, trove.debt)) : '—'}
       />
       <Row
         label="Interest rate"
+        info={INFO['Interest rate']}
         value={
           active && trove.interestRate !== undefined
             ? `${(trove.interestRate / 100).toFixed(2)}% APR`
@@ -232,18 +253,24 @@ function OpenTrove({
         <Box>
           <Row
             label="Total debt"
+            info={INFO['Total debt']}
             value={fmtToken('MUSD', totalDebt, 2)}
             hint={debt > 0n ? `Incl. ${fmtAmount(fee, 2)} fee + 200 reserve` : undefined}
           />
           <Row
             label="Collateral ratio"
+            info={INFO['Collateral ratio']}
             value={
               <Box component="span" sx={{ color: ratioColor(ratio) }}>
                 {fmtRatio(ratio)}
               </Box>
             }
           />
-          <Row label="Liquidation price" value={fmtUsd(liquidationPrice(coll, totalDebt))} />
+          <Row
+            label="Liquidation price"
+            info={INFO['Liquidation price']}
+            value={fmtUsd(liquidationPrice(coll, totalDebt))}
+          />
         </Box>
         {error && <Alert severity="warning">{error}</Alert>}
         <TxNotice state={tx.state} />
@@ -448,18 +475,29 @@ function ManageTrove({
         {field}
         {action !== 'close' && (
           <Box>
-            {action === 'borrow' && <Row label="Borrowing fee" value={fmtToken('MUSD', fee, 2)} />}
+            {action === 'borrow' && (
+              <Row
+                label="Borrowing fee"
+                info={INFO['Borrowing fee']}
+                value={fmtToken('MUSD', fee, 2)}
+              />
+            )}
             <Row label="Collateral" value={fmtToken('BTC', next.coll)} />
             <Row label="Debt" value={fmtToken('MUSD', next.debt, 2)} />
             <Row
               label="Collateral ratio"
+              info={INFO['Collateral ratio']}
               value={
                 <Box component="span" sx={{ color: ratioColor(nextRatio) }}>
                   {fmtRatio(nextRatio)}
                 </Box>
               }
             />
-            <Row label="Liquidation price" value={fmtUsd(liquidationPrice(next.coll, next.debt))} />
+            <Row
+              label="Liquidation price"
+              info={INFO['Liquidation price']}
+              value={fmtUsd(liquidationPrice(next.coll, next.debt))}
+            />
           </Box>
         )}
         {error && <Alert severity="warning">{error}</Alert>}

@@ -1,6 +1,6 @@
 'use client';
 
-import { OpenInNew } from '@mui/icons-material';
+import { InfoOutlined, OpenInNew } from '@mui/icons-material';
 import {
   Alert,
   Box,
@@ -10,8 +10,10 @@ import {
   InputAdornment,
   Link as MuiLink,
   Paper,
+  Skeleton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { ConnectKitButton } from 'connectkit';
@@ -110,24 +112,42 @@ export function PageTop({
   );
 }
 
+/** Small "i" icon that explains a number on hover or tap. */
+export function InfoTip({ text }: { text: string }) {
+  return (
+    <Tooltip title={text} arrow enterTouchDelay={0}>
+      <InfoOutlined
+        tabIndex={0}
+        aria-label={text}
+        sx={{ fontSize: 14, ml: 0.5, verticalAlign: 'middle', cursor: 'help', opacity: 0.7 }}
+      />
+    </Tooltip>
+  );
+}
+
 export function Metric({
   label,
   value,
   hint,
+  info,
+  loading,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
+  info?: string;
+  loading?: boolean;
 }) {
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography variant="description" color="text.secondary">
         {label}
+        {info && <InfoTip text={info} />}
       </Typography>
       <Typography variant="h2" sx={{ mt: 0.5, wordBreak: 'break-word' }}>
-        {value}
+        {loading ? <Skeleton width={110} /> : value}
       </Typography>
-      {hint && (
+      {hint && !loading && (
         <Typography variant="description" color="text.secondary" component="div">
           {hint}
         </Typography>
@@ -176,10 +196,12 @@ export function Row({
   label,
   value,
   hint,
+  info,
 }: {
   label: ReactNode;
   value: ReactNode;
   hint?: ReactNode;
+  info?: string;
 }) {
   return (
     <Stack
@@ -191,6 +213,7 @@ export function Row({
     >
       <Typography color="text.secondary" component="div" sx={{ lineHeight: '24px' }}>
         {label}
+        {info && <InfoTip text={info} />}
       </Typography>
       <Box sx={{ textAlign: 'right' }}>
         <Typography fontWeight={700} component="div" sx={{ lineHeight: '24px' }}>

@@ -9,6 +9,7 @@ import { earnVaultAbi, erc20Abi } from './abis';
 import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtPlain, fmtUsd, parseAmount } from './format';
 import { useMezoTx, useMusdSystem, useUserPosition } from './hooks';
+import { INFO } from './info';
 import {
   AmountField,
   ConnectPrompt,
@@ -35,7 +36,9 @@ export function EarnPage() {
       <PageTop title="Simple Earn">
         <MetricRow>
           <Metric
+            loading={system.isLoading}
             label="Vault value"
+            info={INFO['Vault value']}
             value={fmtUsd(vault?.totalAssets)}
             hint={
               vault?.totalMusd !== undefined
@@ -44,14 +47,25 @@ export function EarnPage() {
             }
           />
           <Metric
+            loading={system.isLoading}
             label="mvMUSD price"
+            info={INFO['mvMUSD price']}
             value={vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'}
           />
           <Metric
+            loading={system.isLoading}
             label="Stability Pool"
+            info={INFO['Stability Pool']}
             value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
           />
-          {address && <Metric label="Your position" value={fmtUsd(position.vault.value)} />}
+          {address && (
+            <Metric
+              loading={system.isLoading}
+              label="Your position"
+              info={INFO['Your position']}
+              value={fmtUsd(position.vault.value)}
+            />
+          )}
         </MetricRow>
       </PageTop>
       <PageContainer>

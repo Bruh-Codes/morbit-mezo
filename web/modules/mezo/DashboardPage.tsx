@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi';
 import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition } from './hooks';
+import { INFO } from './info';
 import { NextStep } from './NextStep';
 import {
   AssetIcon,
@@ -44,9 +45,24 @@ export function DashboardPage() {
       <PageTop title="Dashboard">
         {address && (
           <MetricRow>
-            <Metric label="Net value" value={fmtUsd(netWorth)} />
-            <Metric label="Collateral ratio" value={active ? fmtRatio(trove.icr) : '—'} />
-            <Metric label="Simple Earn" value={fmtUsd(vault.value)} />
+            <Metric
+              loading={position.isLoading}
+              label="Net value"
+              info={INFO['Net value']}
+              value={fmtUsd(netWorth)}
+            />
+            <Metric
+              loading={position.isLoading}
+              label="Collateral ratio"
+              info={INFO['Collateral ratio']}
+              value={active ? fmtRatio(trove.icr) : '—'}
+            />
+            <Metric
+              loading={position.isLoading}
+              label="Simple Earn"
+              info={INFO['Simple Earn']}
+              value={fmtUsd(vault.value)}
+            />
           </MetricRow>
         )}
       </PageTop>
@@ -92,9 +108,14 @@ export function DashboardPage() {
                         hint={fmtUsd(btcValue(troveColl, system.btcPrice))}
                       />
                       <Row label="Debt" value={fmtToken('MUSD', troveDebt, 2)} />
-                      <Row label="Collateral ratio" value={fmtRatio(trove.icr)} />
+                      <Row
+                        label="Collateral ratio"
+                        info={INFO['Collateral ratio']}
+                        value={fmtRatio(trove.icr)}
+                      />
                       <Row
                         label="Liquidation price"
+                        info={INFO['Liquidation price']}
                         value={fmtUsd(liquidationPrice(troveColl, troveDebt))}
                       />
                     </>
@@ -123,6 +144,7 @@ export function DashboardPage() {
                   <Row label="Value" value={fmtUsd(vault.value)} />
                   <Row
                     label="Withdrawable"
+                    info={INFO['Withdrawable']}
                     value={fmtToken('MUSD', vault.musdOut, 2)}
                     hint={vault.btcOut ? `+ ${fmtAmount(vault.btcOut, 8)} BTC` : undefined}
                   />
