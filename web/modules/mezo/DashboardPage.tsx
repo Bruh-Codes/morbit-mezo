@@ -4,13 +4,12 @@ import { Alert, Button, Grid, Link as MuiLink, Stack } from '@mui/material';
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 
-import { MUSD_GAS_COMPENSATION, mezo } from './config';
+import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition } from './hooks';
 import {
   AssetIcon,
   ConnectPrompt,
-  LiveChip,
   Metric,
   MetricRow,
   PageContainer,
@@ -41,27 +40,18 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageTop
-        eyebrow="DASHBOARD"
-        title="Your Mezo positions"
-        description="Balances, your trove and your Simple Earn position, read live from Mezo testnet."
-        actions={<LiveChip online={system.btcPrice !== undefined} />}
-      >
+      <PageTop title="Dashboard">
         {address && (
           <MetricRow>
-            <Metric
-              label="Net value"
-              value={fmtUsd(netWorth)}
-              hint="Wallet + trove equity + Simple Earn"
-            />
-            <Metric label="Trove collateral ratio" value={active ? fmtRatio(trove.icr) : '—'} />
+            <Metric label="Net value" value={fmtUsd(netWorth)} />
+            <Metric label="Collateral ratio" value={active ? fmtRatio(trove.icr) : '—'} />
             <Metric label="Simple Earn" value={fmtUsd(vault.value)} />
           </MetricRow>
         )}
       </PageTop>
       <PageContainer>
         {!address ? (
-          <ConnectPrompt message="Connect a wallet to see your balances, trove and Simple Earn position." />
+          <ConnectPrompt message="Connect a wallet to see your positions." />
         ) : (
           <Grid container spacing={3}>
             <Grid item xs={12} md={4}>
@@ -75,11 +65,9 @@ export function DashboardPage() {
                 <Row label={<Label symbol="MEZO" />} value={fmtAmount(position.mezoBalance, 2)} />
                 {position.btcBalance === 0n && (
                   <Alert severity="info" sx={{ mt: 2 }}>
-                    Get testnet BTC from the{' '}
                     <MuiLink href={mezo.faucetUrl} target="_blank" rel="noopener">
-                      Mezo faucet
+                      Get testnet BTC
                     </MuiLink>
-                    .
                   </Alert>
                 )}
               </Panel>
@@ -100,14 +88,7 @@ export function DashboardPage() {
                       value={fmtToken('BTC', troveColl, 6)}
                       hint={fmtUsd(btcValue(troveColl, system.btcPrice))}
                     />
-                    <Row
-                      label="Debt"
-                      value={fmtToken('MUSD', troveDebt, 2)}
-                      hint={`${fmtAmount(
-                        troveDebt > MUSD_GAS_COMPENSATION ? troveDebt - MUSD_GAS_COMPENSATION : 0n,
-                        2
-                      )} to repay on close`}
-                    />
+                    <Row label="Debt" value={fmtToken('MUSD', troveDebt, 2)} />
                     <Row label="Collateral ratio" value={fmtRatio(trove.icr)} />
                     <Row
                       label="Liquidation price"
@@ -138,15 +119,10 @@ export function DashboardPage() {
                 <Row label="Shares" value={fmtToken('mvMUSD', vault.shares, 4)} />
                 <Row label="Value" value={fmtUsd(vault.value)} />
                 <Row
-                  label="Withdrawable now"
+                  label="Withdrawable"
                   value={fmtToken('MUSD', vault.musdOut, 2)}
                   hint={`+ ${fmtAmount(vault.btcOut, 8)} BTC`}
                 />
-                {!mezo.earnVault && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    The Simple Earn vault is not deployed yet.
-                  </Alert>
-                )}
               </Panel>
             </Grid>
           </Grid>

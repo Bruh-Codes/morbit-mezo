@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  Alert,
-  Box,
-  Divider,
-  Grid,
-  Link as MuiLink,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Divider, Grid, Link as MuiLink, Stack, Tab, Tabs } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
@@ -31,7 +21,6 @@ import { TroveStatus, useMezoTx, useMusdSystem, useTroveHints, useUserPosition }
 import {
   AmountField,
   ConnectPrompt,
-  LiveChip,
   Metric,
   MetricRow,
   PageContainer,
@@ -61,40 +50,21 @@ export function BorrowPage() {
 
   return (
     <>
-      <PageTop
-        eyebrow="BORROW"
-        title="Borrow MUSD against BTC"
-        description="Lock BTC in a Mezo trove and mint MUSD. Morbit calls Mezo's own MUSD contracts, so your trove lives in the MUSD protocol and you can manage it here or in the Mezo app."
-        actions={<LiveChip online={system.btcPrice !== undefined} />}
-      >
+      <PageTop title="Borrow">
         <MetricRow>
-          <Metric label="BTC price (MUSD oracle)" value={fmtUsd(system.btcPrice)} />
+          <Metric label="BTC price" value={fmtUsd(system.btcPrice)} />
+          <Metric label="Minimum debt" value={fmtToken('MUSD', system.minNetDebt, 0)} />
+          <Metric label="Borrowing fee" value={fmtRatio(system.borrowingRate, 2)} />
           <Metric
-            label="Minimum debt"
-            value={fmtToken('MUSD', system.minNetDebt, 0)}
-            hint="Plus a 200 MUSD refundable reserve"
-          />
-          <Metric
-            label="Borrowing fee"
-            value={fmtRatio(system.borrowingRate, 2)}
-            hint="One-time, added to debt"
-          />
-          <Metric
-            label="System collateral ratio"
+            label="System ratio"
             value={fmtRatio(system.tcr)}
-            hint={
-              system.tcr === undefined
-                ? undefined
-                : system.tcr < CCR
-                ? 'Recovery mode'
-                : 'Normal mode'
-            }
+            hint={system.tcr !== undefined && system.tcr < CCR ? 'Recovery mode' : undefined}
           />
         </MetricRow>
       </PageTop>
       <PageContainer>
         {!address ? (
-          <ConnectPrompt message="Connect a wallet on Mezo testnet to open or manage a trove." />
+          <ConnectPrompt message="Connect a wallet to borrow MUSD." />
         ) : (
           <Grid container spacing={3}>
             <Grid item xs={12} md={5}>
@@ -102,9 +72,7 @@ export function BorrowPage() {
             </Grid>
             <Grid item xs={12} md={7}>
               {position.isLoading && position.trove.status === undefined ? (
-                <Panel title="Loading your trove…">
-                  <Typography color="text.secondary">Reading Mezo testnet.</Typography>
-                </Panel>
+                <Panel title="Loading…">{null}</Panel>
               ) : hasTrove ? (
                 <ManageTrove system={system} position={position} />
               ) : (
@@ -142,11 +110,7 @@ function TroveSummary({
         value={fmtToken('BTC', active ? trove.coll : 0n)}
         hint={fmtUsd(btcValue(active ? trove.coll : 0n, btcPrice))}
       />
-      <Row
-        label="Debt"
-        value={fmtToken('MUSD', active ? trove.debt : 0n, 2)}
-        hint="Includes the 200 MUSD reserve"
-      />
+      <Row label="Debt" value={fmtToken('MUSD', active ? trove.debt : 0n, 2)} />
       <Row
         label="Collateral ratio"
         value={
@@ -154,7 +118,6 @@ function TroveSummary({
             {active ? fmtRatio(trove.icr) : '—'}
           </Box>
         }
-        hint="Liquidation below 110%"
       />
       <Row
         label="Liquidation price"
@@ -167,18 +130,16 @@ function TroveSummary({
             ? `${(trove.interestRate / 100).toFixed(2)}% APR`
             : '—'
         }
-        hint="Fixed when the trove opens"
       />
       <Divider sx={{ my: 2 }} />
       <Row label="Wallet BTC" value={fmtAmount(position.btcBalance)} />
       <Row label="Wallet MUSD" value={fmtAmount(position.musdBalance, 2)} />
       {position.btcBalance === 0n && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          You need testnet BTC for collateral and gas. Get some from the{' '}
+          No BTC yet?{' '}
           <MuiLink href={mezo.faucetUrl} target="_blank" rel="noopener">
-            Mezo faucet
+            Get testnet BTC
           </MuiLink>
-          .
         </Alert>
       )}
     </Panel>
@@ -255,11 +216,7 @@ function OpenTrove({
         <AmountField label="Borrow" symbol="MUSD" value={debtText} onChange={setDebtText} />
         <Box>
           <Row label="Borrowing fee" value={fmtToken('MUSD', fee, 2)} />
-          <Row
-            label="Refundable reserve"
-            value="200 MUSD"
-            hint="Returned when you close the trove"
-          />
+          <Row label="Refundable reserve" value="200 MUSD" />
           <Row label="Total debt" value={fmtToken('MUSD', totalDebt, 2)} />
           <Row
             label="Collateral ratio"
@@ -268,7 +225,6 @@ function OpenTrove({
                 {fmtRatio(ratio)}
               </Box>
             }
-            hint="Keep it above 150% to stay safe in recovery mode"
           />
           <Row label="Liquidation price" value={fmtUsd(liquidationPrice(coll, totalDebt))} />
         </Box>
@@ -279,7 +235,7 @@ function OpenTrove({
           disabled={!coll || !debt || !!error || system.btcPrice === undefined}
           onClick={submit}
         >
-          Open trove and borrow MUSD
+          Borrow MUSD
         </SubmitButton>
       </Stack>
     </Panel>
@@ -447,8 +403,7 @@ function ManageTrove({
     ),
     close: (
       <Alert severity="info">
-        Closing burns {fmtAmount(repayable, 2)} MUSD from your wallet (your debt minus the 200 MUSD
-        reserve) and returns {fmtAmount(coll)} BTC.
+        Repay {fmtAmount(repayable, 2)} MUSD, get back {fmtAmount(coll)} BTC.
       </Alert>
     ),
   }[action];
@@ -477,20 +432,17 @@ function ManageTrove({
         {action !== 'close' && (
           <Box>
             {action === 'borrow' && <Row label="Borrowing fee" value={fmtToken('MUSD', fee, 2)} />}
-            <Row label="New collateral" value={fmtToken('BTC', next.coll)} />
-            <Row label="New debt" value={fmtToken('MUSD', next.debt, 2)} />
+            <Row label="Collateral" value={fmtToken('BTC', next.coll)} />
+            <Row label="Debt" value={fmtToken('MUSD', next.debt, 2)} />
             <Row
-              label="New collateral ratio"
+              label="Collateral ratio"
               value={
                 <Box component="span" sx={{ color: ratioColor(nextRatio) }}>
                   {fmtRatio(nextRatio)}
                 </Box>
               }
             />
-            <Row
-              label="New liquidation price"
-              value={fmtUsd(liquidationPrice(next.coll, next.debt))}
-            />
+            <Row label="Liquidation price" value={fmtUsd(liquidationPrice(next.coll, next.debt))} />
           </Box>
         )}
         {error && <Alert severity="warning">{error}</Alert>}

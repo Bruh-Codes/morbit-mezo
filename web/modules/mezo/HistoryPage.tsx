@@ -70,31 +70,23 @@ export function HistoryPage() {
 
   return (
     <>
-      <PageTop
-        eyebrow="TRANSACTIONS"
-        title="Activity"
-        description="Every entry is a real Mezo testnet transaction with a link to the block explorer."
-      />
+      <PageTop title="Activity" />
       <PageContainer>
         {!address ? (
-          <ConnectPrompt message="Connect a wallet to see your Mezo activity." />
+          <ConnectPrompt message="Connect a wallet to see your activity." />
         ) : (
           <Stack spacing={3}>
-            <Panel title="Simple Earn activity (from chain)">
+            <Panel title="Simple Earn">
               {!mezo.earnVault ? (
-                <Typography color="text.secondary">
-                  The Simple Earn vault is not deployed yet.
-                </Typography>
+                <Typography color="text.secondary">Vault not deployed.</Typography>
               ) : events.isLoading ? (
-                <Typography color="text.secondary">Reading vault events…</Typography>
+                <Typography color="text.secondary">Loading…</Typography>
               ) : events.isError ? (
                 <Typography color="text.secondary">
-                  The Mezo RPC did not return vault events. Try again shortly.
+                  Couldn&apos;t load. Try again shortly.
                 </Typography>
               ) : !events.data?.length ? (
-                <Typography color="text.secondary">
-                  No vault deposits or withdrawals yet.
-                </Typography>
+                <Typography color="text.secondary">No deposits or withdrawals yet.</Typography>
               ) : (
                 events.data.map((e) => (
                   <Entry
@@ -107,11 +99,9 @@ export function HistoryPage() {
                 ))
               )}
             </Panel>
-            <Panel title="Sent from this browser">
+            <Panel title="Your transactions">
               {!local.length ? (
-                <Typography color="text.secondary">
-                  Transactions you send from Morbit show up here, including trove actions.
-                </Typography>
+                <Typography color="text.secondary">Nothing yet.</Typography>
               ) : (
                 local.map((tx) => (
                   <Entry

@@ -6,13 +6,12 @@ import { maxUint256 } from 'viem';
 import { useAccount } from 'wagmi';
 
 import { earnVaultAbi, erc20Abi } from './abis';
-import { explorerAddress, mezo } from './config';
+import { mezo } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtPlain, fmtUsd, parseAmount } from './format';
 import { useMezoTx, useMusdSystem, useUserPosition } from './hooks';
 import {
   AmountField,
   ConnectPrompt,
-  LiveChip,
   Metric,
   MetricRow,
   PageContainer,
@@ -33,12 +32,7 @@ export function EarnPage() {
 
   return (
     <>
-      <PageTop
-        eyebrow="SIMPLE EARN"
-        title="Put MUSD to work"
-        description="Deposit MUSD into one Morbit position. The vault supplies it to the MUSD Stability Pool, which repays the debt of liquidated troves and pays depositors the liquidated BTC collateral."
-        actions={<LiveChip online={system.btcPrice !== undefined} />}
-      >
+      <PageTop title="Simple Earn">
         <MetricRow>
           <Metric
             label="Vault value"
@@ -46,18 +40,16 @@ export function EarnPage() {
             hint={
               vault
                 ? `${fmtAmount(vault.totalMusd, 2)} MUSD + ${fmtAmount(vault.totalBtc, 6)} BTC`
-                : 'Vault not deployed'
+                : undefined
             }
           />
           <Metric
             label="mvMUSD price"
             value={vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'}
-            hint="Starts at 1.0000"
           />
           <Metric
-            label="Stability Pool deposits"
+            label="Stability Pool"
             value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
-            hint="All depositors, not only Morbit"
           />
           <Metric label="Your position" value={address ? fmtUsd(position.vault.value) : '—'} />
         </MetricRow>
@@ -66,15 +58,9 @@ export function EarnPage() {
         <Grid container spacing={3}>
           <Grid item xs={12} md={7}>
             {!mezo.earnVault ? (
-              <Panel title="Vault not deployed yet">
-                <Typography color="text.secondary">
-                  The Simple Earn vault contract has not been deployed to Mezo testnet from this
-                  build. Run <code>npm run deploy:mezo</code> in <code>contracts/</code> to deploy
-                  it.
-                </Typography>
-              </Panel>
+              <Panel title="Vault not deployed">{null}</Panel>
             ) : !address ? (
-              <ConnectPrompt message="Connect a wallet on Mezo testnet to deposit MUSD into Simple Earn." />
+              <ConnectPrompt message="Connect a wallet to deposit MUSD." />
             ) : (
               <VaultActions system={system} position={position} />
             )}
@@ -170,17 +156,12 @@ function Deposit({
         onMax={() => setText(fmtPlain(position.musdBalance ?? 0n))}
       />
       <Box>
-        <Row
-          label="You receive (estimate)"
-          value={fmtToken('mvMUSD', estShares, 4)}
-          hint="Exact amount set when the deposit confirms"
-        />
-        <Row label="Goes to" value="MUSD Stability Pool" hint="Through the Morbit vault" />
-        <Row label="Fees" value="None" hint="Only Mezo network gas" />
+        <Row label="You receive" value={fmtToken('mvMUSD', estShares, 4)} />
+        <Row label="Fees" value="None" />
       </Box>
       {position.musdBalance === 0n && (
         <Alert severity="info">
-          You have no MUSD yet. Borrow some against BTC on the Borrow page first.
+          No MUSD yet? <MuiLink href="/borrow/">Borrow some</MuiLink> first.
         </Alert>
       )}
       {error && <Alert severity="warning">{error}</Alert>}
@@ -194,7 +175,7 @@ function Deposit({
       <TxNotice state={depositTx.state} />
       {needsApproval ? (
         <SubmitButton busy={approveTx.busy} disabled={!!error} onClick={approve}>
-          Step 1 of 2 · Approve MUSD
+          Approve MUSD
         </SubmitButton>
       ) : (
         <SubmitButton busy={depositTx.busy} disabled={!amount || !!error} onClick={deposit}>
@@ -256,15 +237,9 @@ function Withdraw({
         <Row
           label="You receive BTC"
           value={fmtToken('BTC', btcOut, 8)}
-          hint={
-            btcOut ? fmtUsd(btcValue(btcOut, system.btcPrice)) : 'From liquidation gains, if any'
-          }
+          hint={btcOut ? fmtUsd(btcValue(btcOut, system.btcPrice)) : undefined}
         />
       </Box>
-      <Alert severity="info">
-        Withdrawals pay out your share of the vault&apos;s MUSD and BTC. The Stability Pool blocks
-        MUSD withdrawals while any trove sits below 110%, until it is liquidated.
-      </Alert>
       {error && <Alert severity="warning">{error}</Alert>}
       <TxNotice state={tx.state} />
       <SubmitButton busy={tx.busy} disabled={!amount || !!error} onClick={withdraw}>
@@ -276,33 +251,20 @@ function Withdraw({
 
 function HowItWorks() {
   return (
-    <Panel title="How Simple Earn works">
+    <Panel title="How it works">
       <Stack spacing={2}>
-        <Step n={1} title="You deposit MUSD">
-          The Morbit vault mints mvMUSD shares at the current share price and supplies all MUSD to
-          Mezo&apos;s Stability Pool in the same transaction.
+        <Step n={1} title="Deposit MUSD">
+          The vault puts it in the MUSD Stability Pool.
         </Step>
-        <Step n={2} title="The pool backs liquidations">
-          When a trove falls below 110%, its debt is paid from the pool and its BTC goes to
-          depositors. Liquidated BTC is usually worth more than the MUSD it replaces.
+        <Step n={2} title="Earn BTC">
+          The pool repays liquidated troves and receives their BTC.
         </Step>
-        <Step n={3} title="You withdraw MUSD and BTC">
-          Redeeming shares returns your share of the vault&apos;s MUSD and any BTC gains. Morbit
-          does not swap, rebalance or compound.
+        <Step n={3} title="Withdraw anytime">
+          Get your share of MUSD and BTC.
         </Step>
-        <Alert severity="warning">
-          Earnings depend on liquidations, so they can be zero for long periods. If BTC falls fast,
-          the BTC you receive can be worth less than the MUSD it replaced. This is a testnet
-          deployment and the vault is not audited.
-        </Alert>
-        {mezo.earnVault && (
-          <Typography variant="description" color="text.secondary">
-            Vault contract:{' '}
-            <MuiLink href={explorerAddress(mezo.earnVault)} target="_blank" rel="noopener">
-              {mezo.earnVault}
-            </MuiLink>
-          </Typography>
-        )}
+        <Typography variant="description" color="text.secondary">
+          Testnet. Unaudited. Returns depend on liquidations.
+        </Typography>
       </Stack>
     </Panel>
   );

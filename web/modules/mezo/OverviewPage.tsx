@@ -1,13 +1,13 @@
 'use client';
 
 import { ArrowForward } from '@mui/icons-material';
-import { Box, Button, Grid, Link as MuiLink, Stack, Typography } from '@mui/material';
+import { Box, Button, Grid, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 
-import { CCR, explorerAddress, mezo } from './config';
-import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd } from './format';
+import { CCR } from './config';
+import { btcValue, fmtAmount, fmtRatio, fmtToken, fmtUsd } from './format';
 import { useMusdSystem } from './hooks';
-import { AssetIcon, LiveChip, Metric, MetricRow, PageContainer, PageTop, Panel, Row } from './ui';
+import { AssetIcon, Metric, MetricRow, PageContainer, PageTop, Panel, Row } from './ui';
 
 export function OverviewPage() {
   const system = useMusdSystem();
@@ -15,68 +15,53 @@ export function OverviewPage() {
 
   return (
     <>
-      <PageTop
-        eyebrow="MORBIT ON MEZO"
-        title="Borrow MUSD against BTC, then put it to work"
-        description="Every number on this page is read live from the MUSD contracts on Mezo testnet."
-        actions={<LiveChip online={system.btcPrice !== undefined} />}
-      >
+      <PageTop title="Borrow MUSD against BTC. Earn with it.">
         <MetricRow>
-          <Metric label="BTC price" value={fmtUsd(system.btcPrice)} hint="MUSD PriceFeed" />
-          <Metric
-            label="MUSD borrowed"
-            value={`${fmtAmount(system.systemDebt, 0)}`}
-            hint="All troves"
-          />
+          <Metric label="BTC price" value={fmtUsd(system.btcPrice)} />
+          <Metric label="MUSD borrowed" value={fmtAmount(system.systemDebt, 0)} />
           <Metric
             label="BTC collateral"
             value={fmtToken('BTC', system.systemColl, 2)}
             hint={fmtUsd(btcValue(system.systemColl, system.btcPrice), true)}
           />
           <Metric
-            label="System collateral ratio"
+            label="System ratio"
             value={fmtRatio(system.tcr)}
             hint={
-              system.tcr === undefined
-                ? undefined
-                : system.tcr < CCR
-                ? 'Recovery mode'
-                : 'Normal mode'
+              system.tcr === undefined ? undefined : system.tcr < CCR ? 'Recovery mode' : undefined
             }
           />
         </MetricRow>
       </PageTop>
       <PageContainer>
         {system.isError && system.btcPrice === undefined && (
-          <Panel>
-            <Typography color="error.main">
-              Could not reach Mezo testnet. Check your connection and refresh.
-            </Typography>
-          </Panel>
+          <Typography color="error.main" sx={{ mb: 3 }}>
+            Can&apos;t reach Mezo testnet. Refresh to retry.
+          </Typography>
         )}
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
             <ProductCard
               icon="MUSD"
-              title="Borrow MUSD"
-              body="Lock BTC in a Mezo trove and mint MUSD at a fixed rate. Morbit shows your collateral ratio and liquidation price before you sign."
+              title="Borrow"
+              body="Lock BTC, mint MUSD."
               href="/borrow/"
-              cta="Open or manage a trove"
+              cta="Borrow MUSD"
             >
               <Row label="Minimum debt" value={fmtToken('MUSD', system.minNetDebt, 0)} />
               <Row label="Borrowing fee" value={fmtRatio(system.borrowingRate, 2)} />
-              <Row label="Liquidation threshold" value="110%" />
+              <Row label="Liquidation at" value="110%" />
             </ProductCard>
           </Grid>
           <Grid item xs={12} md={6}>
             <ProductCard
               icon="mvMUSD"
               title="Simple Earn"
-              body="Deposit MUSD into one Morbit vault position. The vault supplies it to the MUSD Stability Pool and passes liquidation gains back to you."
+              body="Earn BTC from liquidations with your MUSD."
               href="/earn/"
               cta="Deposit MUSD"
             >
-              <Row label="Vault value" value={vault ? fmtUsd(vault.totalAssets) : 'Not deployed'} />
+              <Row label="Vault value" value={vault ? fmtUsd(vault.totalAssets) : '—'} />
               <Row
                 label="mvMUSD price"
                 value={
@@ -84,44 +69,10 @@ export function OverviewPage() {
                 }
               />
               <Row
-                label="Stability Pool deposits"
+                label="Stability Pool"
                 value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
-                hint={`${fmtAmount(system.stabilityPoolBtc, 6)} BTC gains held`}
               />
             </ProductCard>
-          </Grid>
-          <Grid item xs={12}>
-            <Panel title="Contracts">
-              <Grid container columnSpacing={4}>
-                {[
-                  ['MUSD token', mezo.musd],
-                  ['BorrowerOperations', mezo.borrowerOperations],
-                  ['TroveManager', mezo.troveManager],
-                  ['PriceFeed', mezo.priceFeed],
-                  ['Morbit Simple Earn vault', mezo.earnVault],
-                ].map(([label, address]) => (
-                  <Grid item xs={12} md={6} key={label}>
-                    <Row
-                      label={label}
-                      value={
-                        address ? (
-                          <MuiLink
-                            href={explorerAddress(address)}
-                            target="_blank"
-                            rel="noopener"
-                            sx={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all' }}
-                          >
-                            {address}
-                          </MuiLink>
-                        ) : (
-                          'Not deployed'
-                        )
-                      }
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            </Panel>
           </Grid>
         </Grid>
       </PageContainer>
@@ -149,10 +100,12 @@ function ProductCard({
       <Stack spacing={2} sx={{ height: '100%' }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <AssetIcon symbol={icon} size={36} />
-          <Typography variant="h3">{title}</Typography>
+          <Box>
+            <Typography variant="h3">{title}</Typography>
+            <Typography color="text.secondary">{body}</Typography>
+          </Box>
         </Stack>
-        <Typography color="text.secondary">{body}</Typography>
-        <Box>{children}</Box>
+        <Box sx={{ flexGrow: 1 }}>{children}</Box>
         <Button
           component={Link}
           href={href}

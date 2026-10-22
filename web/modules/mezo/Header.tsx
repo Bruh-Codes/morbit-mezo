@@ -24,8 +24,9 @@ export function Header() {
   const theme = useTheme();
   const colorMode = useContext(ColorModeContext);
   const { isConnected, chainId } = useAccount();
-  const { switchChain } = useSwitchChain();
-  const wrongNetwork = isConnected && chainId !== MEZO_TESTNET_ID;
+  const { switchChain, isPending: switching } = useSwitchChain();
+  // Only flag once the wallet has reported a chain, so a reconnecting wallet doesn't flash it.
+  const wrongNetwork = isConnected && chainId !== undefined && chainId !== MEZO_TESTNET_ID;
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href.replace(/\/$/, ''));
@@ -66,14 +67,18 @@ export function Header() {
         </Stack>
         <Box sx={{ flexGrow: 1 }} />
         {wrongNetwork && (
-          <Button
-            size="small"
-            variant="contained"
-            color="warning"
-            onClick={() => switchChain({ chainId: MEZO_TESTNET_ID })}
-          >
-            Switch to Mezo testnet
-          </Button>
+          <Tooltip title="Your wallet is on another network">
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              disabled={switching}
+              onClick={() => switchChain({ chainId: MEZO_TESTNET_ID })}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              {switching ? 'Check your wallet…' : 'Switch network'}
+            </Button>
+          </Tooltip>
         )}
         <Tooltip title={theme.palette.mode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton

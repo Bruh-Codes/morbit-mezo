@@ -5,7 +5,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Container,
   InputAdornment,
@@ -47,7 +46,7 @@ export function PageTop({
     <Box
       sx={{
         position: 'relative',
-        py: { xs: 5, md: 7 },
+        py: { xs: 4, md: 5 },
         mb: 4,
         bgcolor: (theme) =>
           theme.palette.mode === 'dark' ? theme.palette.background.surface2 : '#E9ECDD',
@@ -89,7 +88,7 @@ export function PageTop({
                 {eyebrow}
               </Typography>
             )}
-            <Typography variant="h1" sx={{ fontSize: { xs: 32, md: 42 }, mb: 1 }}>
+            <Typography variant="h1" sx={{ fontSize: { xs: 28, md: 38 }, mb: 1 }}>
               {title}
             </Typography>
             {description && (
@@ -225,21 +224,6 @@ export function AssetIcon({
       src={src}
       alt=""
       sx={{ width: size, height: size, borderRadius: '50%', flex: '0 0 auto' }}
-    />
-  );
-}
-
-export function LiveChip({ online }: { online: boolean }) {
-  return (
-    <Chip
-      size="small"
-      label={online ? 'Live · Mezo testnet' : 'Connecting to Mezo testnet…'}
-      sx={{
-        bgcolor: online ? 'secondary.main' : 'action.selected',
-        color: online ? '#111' : 'text.primary',
-        fontWeight: 700,
-        '& .MuiChip-label': { px: 1.25 },
-      }}
     />
   );
 }

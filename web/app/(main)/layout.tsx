@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import { Footer } from 'modules/mezo/Footer';
 import { Header } from 'modules/mezo/Header';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -8,6 +9,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <Box component="main" sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         {children}
       </Box>
+      <Footer />
     </>
   );
 }
