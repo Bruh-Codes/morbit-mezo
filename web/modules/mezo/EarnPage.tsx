@@ -1,14 +1,34 @@
 'use client';
 
-import { Alert, Box, Grid, Link as MuiLink, Stack, Tab, Tabs, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Divider,
+  Grid,
+  Link as MuiLink,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
 import { useEffect, useState } from 'react';
 import { maxUint256 } from 'viem';
 import { useAccount } from 'wagmi';
 
-import { earnVaultAbi, erc20Abi } from './abis';
-import { mezo } from './config';
-import { btcValue, fmtAmount, fmtToken, fmtPlain, fmtUsd, parseAmount } from './format';
-import { useMezoTx, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
+import { autoEarnVaultAbi, earnVaultAbi, erc20Abi } from './abis';
+import { EARN, mezo } from './config';
+import {
+  btcValue,
+  fmtAmount,
+  fmtPlain,
+  fmtRatio,
+  fmtToken,
+  fmtUsd,
+  parseAmount,
+  timeAgo,
+} from './format';
+import { useMezoTx, useMusdSystem, useNow, useUserPosition, useVaultDeposited } from './hooks';
 import { INFO } from './info';
 import {
   AmountField,
@@ -31,10 +51,11 @@ export function EarnPage() {
   const position = useUserPosition(system.btcPrice);
   const deposited = useVaultDeposited(address);
   const vault = system.vault;
+  const auto = system.autoEarn;
 
   return (
     <>
-      <PageTop title="Simple Earn">
+      <PageTop title={EARN.name}>
         <MetricRow>
           <Metric
             loading={system.isLoading}
@@ -53,12 +74,22 @@ export function EarnPage() {
             info={INFO['Share price']}
             value={vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'}
           />
-          <Metric
-            loading={system.isLoading}
-            label="Stability Pool"
-            info={INFO['Stability Pool']}
-            value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
-          />
+          {mezo.autoEarn ? (
+            <Metric
+              loading={system.isLoading}
+              label="MEZO rewards"
+              info={INFO['MEZO rewards']}
+              value={auto?.rewardApr !== undefined ? `${fmtRatio(auto.rewardApr, 1)} APR` : '—'}
+              hint={auto?.rewardApr === undefined ? 'No reward stream running' : undefined}
+            />
+          ) : (
+            <Metric
+              loading={system.isLoading}
+              label="Stability Pool"
+              info={INFO['Stability Pool']}
+              value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
+            />
+          )}
           {address && (
             <Metric
               loading={system.isLoading}
@@ -79,7 +110,8 @@ export function EarnPage() {
         </MetricRow>
       </PageTop>
       <PageContainer>
-        <Grid container spacing={3}>
+        {address && position.legacy && <MoveFromSimpleEarn position={position} />}
+        <Grid container spacing={3} alignItems="flex-start">
           <Grid item xs={12} md={7}>
             {!mezo.earnVault ? (
               <Panel title="Vault not deployed">{null}</Panel>
@@ -90,11 +122,153 @@ export function EarnPage() {
             )}
           </Grid>
           <Grid item xs={12} md={5}>
-            <HowItWorks />
+            <Stack spacing={3}>
+              {mezo.autoEarn && <AutoEarnPanel system={system} position={position} />}
+              <HowItWorks />
+            </Stack>
           </Grid>
         </Grid>
       </PageContainer>
     </>
+  );
+}
+
+/** Rewards to claim and BTC gains waiting to be compounded. */
+function AutoEarnPanel({
+  system,
+  position,
+}: {
+  system: ReturnType<typeof useMusdSystem>;
+  position: ReturnType<typeof useUserPosition>;
+}) {
+  const { address } = useAccount();
+  const now = useNow();
+  const refresh = () => {
+    position.refetch();
+    system.refetch();
+  };
+  const claimTx = useMezoTx(refresh);
+  const harvestTx = useMezoTx(refresh);
+  const auto = system.autoEarn;
+  const pendingBtc = system.vault?.totalBtc ?? 0n;
+  const canHarvest = auto?.minHarvestBtc !== undefined && pendingBtc >= auto.minHarvestBtc;
+  const earned = position.vault.mezoEarned ?? 0n;
+  const lastHarvest = auto?.lastHarvestAt ? Number(auto.lastHarvestAt) * 1000 : undefined;
+
+  return (
+    <Panel title="Rewards">
+      <Stack spacing={2.5}>
+        {address && (
+          <Box>
+            <Row
+              label="Your MEZO"
+              value={fmtToken('MEZO', earned, 4)}
+              hint={
+                auto?.mezoPrice !== undefined && earned
+                  ? fmtUsd((earned * auto.mezoPrice) / WAD)
+                  : undefined
+              }
+            />
+            <TxNotice state={claimTx.state} />
+            <Button
+              variant="outlined"
+              fullWidth
+              sx={{ mt: 1.5 }}
+              disabled={!earned || claimTx.busy}
+              onClick={() =>
+                claimTx.send(
+                  'Claim MEZO',
+                  { address: mezo.earnVault!, abi: autoEarnVaultAbi, functionName: 'claimRewards' },
+                  fmtToken('MEZO', earned, 4)
+                )
+              }
+            >
+              {claimTx.busy ? 'Claiming…' : 'Claim MEZO'}
+            </Button>
+          </Box>
+        )}
+        <Divider />
+        <Box>
+          <Row
+            label="BTC gains to compound"
+            info={INFO['BTC gains to compound']}
+            value={fmtToken('BTC', pendingBtc, 8)}
+            hint={pendingBtc ? fmtUsd(btcValue(pendingBtc, system.btcPrice)) : undefined}
+          />
+          <Row
+            label="Compounded so far"
+            value={fmtToken('MUSD', auto?.totalCompoundedMusd, 2)}
+            hint={lastHarvest ? `Last ${timeAgo(lastHarvest, now)}` : undefined}
+          />
+          <TxNotice state={harvestTx.state} />
+          {address && (
+            <Button
+              variant="outlined"
+              fullWidth
+              sx={{ mt: 1.5 }}
+              disabled={!canHarvest || harvestTx.busy}
+              onClick={() =>
+                harvestTx.send(
+                  'Compound',
+                  {
+                    address: mezo.earnVault!,
+                    abi: autoEarnVaultAbi,
+                    functionName: 'harvest',
+                    args: [0n],
+                  },
+                  `${fmtAmount(pendingBtc, 8)} BTC → MUSD`
+                )
+              }
+            >
+              {harvestTx.busy
+                ? 'Compounding…'
+                : canHarvest
+                ? 'Compound now'
+                : 'Nothing to compound'}
+            </Button>
+          )}
+        </Box>
+      </Stack>
+    </Panel>
+  );
+}
+
+/** Guides Simple Earn depositors to withdraw, so they can deposit into Auto Earn. */
+function MoveFromSimpleEarn({ position }: { position: ReturnType<typeof useUserPosition> }) {
+  const tx = useMezoTx(() => position.refetch());
+  const { address } = useAccount();
+  const legacy = position.legacy!;
+  return (
+    <Alert
+      severity="info"
+      sx={{ mb: 3, alignItems: 'center' }}
+      action={
+        <Button
+          color="inherit"
+          variant="outlined"
+          size="small"
+          disabled={tx.busy}
+          onClick={() =>
+            tx.send(
+              'Simple Earn withdrawal',
+              {
+                address: mezo.legacyVault!,
+                abi: earnVaultAbi,
+                functionName: 'redeem',
+                args: [legacy.shares, address!, address!],
+              },
+              'All shares, moving to Auto Earn'
+            )
+          }
+        >
+          {tx.busy ? 'Withdrawing…' : 'Withdraw'}
+        </Button>
+      }
+    >
+      You have {fmtUsd(legacy.value)} in Simple Earn. Withdraw it, then deposit here to
+      auto-compound and earn MEZO.
+      {tx.state.status === 'error' && <Box sx={{ mt: 0.5 }}>{tx.state.error}</Box>}
+    </Alert>
   );
 }
 
@@ -161,12 +335,12 @@ function Deposit({
     approveTx.send(
       'Approve MUSD',
       { address: mezo.musd, abi: erc20Abi, functionName: 'approve', args: [vault, maxUint256] },
-      'Simple Earn vault'
+      `${EARN.name} vault`
     );
 
   const deposit = async () => {
     const done = await depositTx.send(
-      'Simple Earn deposit',
+      `${EARN.name} deposit`,
       { address: vault, abi: earnVaultAbi, functionName: 'deposit', args: [amount, address!] },
       fmtToken('MUSD', amount, 2)
     );
@@ -184,7 +358,7 @@ function Deposit({
         onMax={() => setText(fmtPlain(position.musdBalance ?? 0n))}
       />
       <Box>
-        <Row label="You receive" value={fmtToken('mvMUSD', estShares, 4)} />
+        <Row label="You receive" value={fmtToken(EARN.share, estShares, 4)} />
         <Row label="Fees" value="None" />
       </Box>
       {position.musdBalance === 0n && (
@@ -223,43 +397,78 @@ function Withdraw({
 }) {
   const { address } = useAccount();
   const [text, setText] = useState('');
+  // A percentage pick redeems an exact share count, so 100% never leaves dust behind.
+  const [pick, setPick] = useState<number | undefined>();
   const tx = useMezoTx(() => {
     position.refetch();
     system.refetch();
   });
   const shares = position.vault.shares ?? 0n;
+  const value = position.vault.value ?? 0n;
   const amount = parseAmount(text) ?? 0n;
-  const portion = (value?: bigint) =>
-    value !== undefined && shares > 0n ? (value * amount) / shares : undefined;
+  const sharesToRedeem =
+    pick !== undefined
+      ? (shares * BigInt(pick)) / 100n
+      : value > 0n
+      ? (amount * shares) / value
+      : 0n;
+  const portion = (out?: bigint) =>
+    out !== undefined && shares > 0n ? (out * sharesToRedeem) / shares : undefined;
   const musdOut = portion(position.vault.musdOut);
   const btcOut = portion(position.vault.btcOut);
-  const error = amount > shares ? 'You do not hold that many mvMUSD.' : undefined;
+  const error =
+    pick === undefined && amount > value && value > 0n
+      ? `You can withdraw up to ${fmtUsd(value)}.`
+      : undefined;
+
+  const choose = (pct: number) => {
+    setPick(pct);
+    setText(fmtPlain((value * BigInt(pct)) / 100n));
+  };
 
   const withdraw = async () => {
     const done = await tx.send(
-      'Simple Earn withdrawal',
+      `${EARN.name} withdrawal`,
       {
         address: mezo.earnVault!,
         abi: earnVaultAbi,
         functionName: 'redeem',
-        args: [amount, address!, address!],
+        args: [sharesToRedeem, address!, address!],
       },
-      fmtToken('mvMUSD', amount, 4)
+      `${fmtAmount(musdOut, 2)} MUSD${btcOut ? ` + ${fmtAmount(btcOut, 6)} BTC` : ''}`
     );
-    if (done) setText('');
+    if (done) {
+      setText('');
+      setPick(undefined);
+    }
   };
 
   return (
     <Stack spacing={2.5}>
       <AmountField
         label="Withdraw"
-        symbol="mvMUSD"
+        symbol="MUSD"
         value={text}
-        onChange={setText}
-        balance={shares}
-        balanceLabel="Your shares"
-        onMax={() => setText(fmtPlain(shares))}
+        onChange={(next) => {
+          setText(next);
+          setPick(undefined);
+        }}
+        balance={value}
+        balanceLabel="Your position"
       />
+      <Stack direction="row" spacing={1}>
+        {[25, 50, 75, 100].map((pct) => (
+          <Button
+            key={pct}
+            size="small"
+            variant={pick === pct ? 'contained' : 'outlined'}
+            onClick={() => choose(pct)}
+            disabled={!shares}
+          >
+            {pct === 100 ? 'All' : `${pct}%`}
+          </Button>
+        ))}
+      </Stack>
       <Box>
         <Row label="You receive MUSD" value={fmtToken('MUSD', musdOut, 2)} />
         <Row
@@ -270,7 +479,7 @@ function Withdraw({
       </Box>
       {error && <Alert severity="warning">{error}</Alert>}
       <TxNotice state={tx.state} />
-      <SubmitButton busy={tx.busy} disabled={!amount || !!error} onClick={withdraw}>
+      <SubmitButton busy={tx.busy} disabled={!sharesToRedeem || !!error} onClick={withdraw}>
         Withdraw
       </SubmitButton>
     </Stack>
@@ -285,11 +494,22 @@ function HowItWorks() {
           The vault puts it in the MUSD Stability Pool.
         </Step>
         <Step n={2} title="Earn BTC">
-          The pool repays liquidated troves and receives their BTC.
+          The pool repays liquidated loans and receives their BTC.
         </Step>
-        <Step n={3} title="Withdraw anytime">
-          Get your share of MUSD and BTC.
-        </Step>
+        {mezo.autoEarn ? (
+          <>
+            <Step n={3} title="Auto-compound">
+              BTC gains are swapped to MUSD on Mezo Pools and deposited again.
+            </Step>
+            <Step n={4} title="Earn MEZO">
+              MEZO rewards stream to every depositor. Claim anytime.
+            </Step>
+          </>
+        ) : (
+          <Step n={3} title="Withdraw anytime">
+            Get your share of MUSD and BTC.
+          </Step>
+        )}
         <Typography variant="description" color="text.secondary">
           Testnet. Unaudited. Returns depend on liquidations.
         </Typography>

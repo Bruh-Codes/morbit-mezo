@@ -12,7 +12,11 @@ const CONTRACTS: [string, string | undefined][] = [
   ['BorrowerOperations', mezo.borrowerOperations],
   ['TroveManager', mezo.troveManager],
   ['PriceFeed', mezo.priceFeed],
-  ['Simple Earn vault', mezo.earnVault],
+  [mezo.autoEarn ? 'Auto Earn vault' : 'Simple Earn vault', mezo.earnVault],
+  ...(mezo.legacyVault ? ([['Simple Earn vault', mezo.legacyVault]] as [string, string][]) : []),
+  ...(mezo.autoEarn
+    ? ([['Mezo Pools router', mezo.mezoRouter]] as [string, string | undefined][])
+    : []),
 ];
 
 export function Footer() {

@@ -18,7 +18,7 @@ import {
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 
-import { CCR, MCR, mezo } from './config';
+import { EARN, mezo, ratioColor } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
 import { INFO } from './info';
@@ -74,7 +74,7 @@ export function DashboardPage() {
             />
             <Metric
               loading={position.isLoading}
-              label="Simple Earn"
+              label={EARN.name}
               info={INFO['Simple Earn']}
               value={fmtUsd(vault.value)}
             />
@@ -173,8 +173,12 @@ export function DashboardPage() {
                             <TableCell>
                               <Name
                                 icon="mvMUSD"
-                                title="Simple Earn"
-                                sub="Earns BTC from liquidations"
+                                title={EARN.name}
+                                sub={
+                                  mezo.autoEarn
+                                    ? 'Compounds BTC gains, earns MEZO'
+                                    : 'Earns BTC from liquidations'
+                                }
                               />
                             </TableCell>
                             <TableCell align="right">
@@ -206,6 +210,11 @@ export function DashboardPage() {
                             <TableCell align="right">
                               <Cell
                                 main={<Earnings value={vault.value} deposited={deposited.data} />}
+                                sub={
+                                  vault.mezoEarned
+                                    ? `+${fmtAmount(vault.mezoEarned, 2)} MEZO`
+                                    : undefined
+                                }
                               />
                             </TableCell>
                             <TableCell align="right">
@@ -221,7 +230,39 @@ export function DashboardPage() {
                             </TableCell>
                           </TableRow>
                         )}
-                        {!active && !vault.shares && (
+                        {position.legacy && (
+                          <TableRow>
+                            <TableCell>
+                              <Name
+                                icon="mvMUSD"
+                                title="Simple Earn"
+                                sub={`Move to ${EARN.name} for MEZO rewards`}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell
+                                main="—"
+                                sub={`${fmtAmount(position.legacy.shares, 2)} shares`}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell main="—" />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell main={fmtUsd(position.legacy.value)} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell main="—" />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Cell main="—" />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Actions items={[['Move', '/earn/']]} />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {!active && !vault.shares && !position.legacy && (
                           <TableRow>
                             <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                               <Typography color="text.secondary" sx={{ mb: 1.5 }}>
@@ -287,13 +328,6 @@ export function DashboardPage() {
       </PageContainer>
     </>
   );
-}
-
-function ratioColor(ratio?: bigint) {
-  if (ratio === undefined) return 'text.primary';
-  if (ratio < MCR) return 'error.main';
-  if (ratio < CCR) return 'warning.main';
-  return 'success.main';
 }
 
 function Name({ icon, title, sub }: { icon: 'MUSD' | 'mvMUSD'; title: string; sub: string }) {

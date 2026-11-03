@@ -13,19 +13,23 @@ import {
 } from 'wagmi';
 
 import {
+  autoEarnVaultAbi,
   borrowerOperationsAbi,
   earnVaultAbi,
   erc20Abi,
+  mezoRouterAbi,
   priceFeedAbi,
   sortedTrovesAbi,
   stabilityPoolAbi,
   troveManagerAbi,
 } from './abis';
 import { mezo, MEZO_TESTNET_ID, ZERO } from './config';
-import { chunked } from './logs';
+import { cachedChunked } from './logs';
 import { recordTx, updateTx } from './txHistory';
 
 const chainId = MEZO_TESTNET_ID;
+const WAD = 10n ** 18n;
+const YEAR = 365n * 24n * 60n * 60n;
 const REFRESH_MS = 15_000;
 
 function ok<T>(
@@ -50,6 +54,18 @@ export function useMusdAddresses() {
   };
 }
 
+export type AutoEarnStats = {
+  rewardRate?: bigint;
+  periodFinish?: bigint;
+  minHarvestBtc?: bigint;
+  totalCompoundedMusd?: bigint;
+  lastHarvestAt?: bigint;
+  /** MUSD for 1 MEZO on Mezo Pools. */
+  mezoPrice?: bigint;
+  /** Yearly MEZO rewards ÷ vault value, 1e18 = 100%. Undefined when no stream is running. */
+  rewardApr?: bigint;
+};
+
 export type MusdSystem = {
   btcPrice?: bigint;
   tcr?: bigint;
@@ -68,6 +84,8 @@ export type MusdSystem = {
     maxDeposit?: bigint;
     depositsPaused?: boolean;
   };
+  /** Auto Earn only. */
+  autoEarn?: AutoEarnStats;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -132,6 +150,48 @@ export function useMusdSystem(): MusdSystem {
     },
   });
 
+  const auto = useReadContracts({
+    allowFailure: true,
+    contracts: [
+      ...(
+        [
+          'rewardRate',
+          'periodFinish',
+          'minHarvestBtc',
+          'totalCompoundedMusd',
+          'lastHarvestAt',
+        ] as const
+      ).map((functionName) => ({
+        address: vault ?? ZERO,
+        abi: autoEarnVaultAbi,
+        functionName,
+        chainId,
+      })),
+      {
+        address: mezo.mezoRouter ?? ZERO,
+        abi: mezoRouterAbi,
+        functionName: 'getAmountsOut',
+        args: [
+          WAD,
+          [
+            {
+              from: mezo.mezoToken,
+              to: mezo.musd,
+              stable: false,
+              factory: mezo.poolFactory ?? ZERO,
+            },
+          ],
+        ],
+        chainId,
+      },
+    ],
+    query: {
+      enabled: mezo.autoEarn,
+      refetchInterval: REFRESH_MS,
+      placeholderData: keepPreviousData,
+    },
+  });
+
   const btcPrice = ok<bigint>(data?.[0]);
   const systemColl = ok<bigint>(data?.[1]);
   const systemDebt = ok<bigint>(data?.[2]);
@@ -159,9 +219,34 @@ export function useMusdSystem(): MusdSystem {
           depositsPaused: ok(data?.[13]),
         }
       : undefined,
+    autoEarn: mezo.autoEarn ? autoEarnStats(auto.data, ok<bigint>(data?.[7])) : undefined,
     isLoading,
     isError,
-    refetch,
+    refetch: () => {
+      refetch();
+      if (mezo.autoEarn) auto.refetch();
+    },
+  };
+}
+
+type Results = readonly { status: 'success' | 'failure'; result?: unknown }[] | undefined;
+
+function autoEarnStats(data: Results, totalAssets?: bigint): AutoEarnStats {
+  const rewardRate = ok<bigint>(data?.[0]);
+  const periodFinish = ok<bigint>(data?.[1]);
+  const mezoPrice = ok<readonly bigint[]>(data?.[5])?.[1];
+  const live = periodFinish !== undefined && periodFinish > BigInt(Math.floor(Date.now() / 1000));
+  return {
+    rewardRate,
+    periodFinish,
+    minHarvestBtc: ok(data?.[2]),
+    totalCompoundedMusd: ok(data?.[3]),
+    lastHarvestAt: ok(data?.[4]),
+    mezoPrice,
+    rewardApr:
+      live && rewardRate && mezoPrice !== undefined && totalAssets
+        ? (rewardRate * YEAR * mezoPrice) / totalAssets
+        : undefined,
   };
 }
 
@@ -185,7 +270,16 @@ export type UserPosition = {
     icr?: bigint;
     interestRate?: number;
   };
-  vault: { shares?: bigint; value?: bigint; musdOut?: bigint; btcOut?: bigint };
+  vault: {
+    shares?: bigint;
+    value?: bigint;
+    musdOut?: bigint;
+    btcOut?: bigint;
+    /** Auto Earn: MEZO ready to claim. */
+    mezoEarned?: bigint;
+  };
+  /** Shares still in Simple Earn after Auto Earn launched. */
+  legacy?: { shares: bigint; value?: bigint };
   isLoading: boolean;
   refetch: () => void;
 };
@@ -242,9 +336,19 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
         chainId,
       },
       { address: vault, abi: earnVaultAbi, functionName: 'balanceOf', args: [user], chainId },
+      {
+        address: mezo.legacyVault ?? ZERO,
+        abi: earnVaultAbi,
+        functionName: 'balanceOf',
+        args: [user],
+        chainId,
+      },
+      // Fails harmlessly on Simple Earn, which has no rewards.
+      { address: vault, abi: autoEarnVaultAbi, functionName: 'earned', args: [user], chainId },
     ],
     query: { enabled: !!address, refetchInterval: REFRESH_MS, placeholderData: keepPreviousData },
   });
+  const legacyShares = mezo.legacyVault ? ok<bigint>(data?.[8]) : undefined;
 
   const shares = mezo.earnVault ? ok<bigint>(data?.[7]) : undefined;
   const preview = useReadContracts({
@@ -264,9 +368,16 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
         args: [shares ?? 0n],
         chainId,
       },
+      {
+        address: mezo.legacyVault ?? ZERO,
+        abi: earnVaultAbi,
+        functionName: 'convertToAssets',
+        args: [legacyShares ?? 0n],
+        chainId,
+      },
     ],
     query: {
-      enabled: !!address && !!mezo.earnVault && !!shares,
+      enabled: !!address && !!mezo.earnVault && (!!shares || !!legacyShares),
       refetchInterval: REFRESH_MS,
       placeholderData: keepPreviousData,
     },
@@ -293,7 +404,11 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
       value: shares === 0n ? 0n : ok(preview.data?.[0]),
       musdOut: shares === 0n ? 0n : redeem?.[0],
       btcOut: shares === 0n ? 0n : redeem?.[1],
+      mezoEarned: mezo.autoEarn ? ok<bigint>(data?.[9]) : undefined,
     },
+    legacy: legacyShares
+      ? { shares: legacyShares, value: ok<bigint>(preview.data?.[2]) }
+      : undefined,
     isLoading: isLoading || btc.isLoading,
     refetch: () => {
       btc.refetch();
@@ -393,10 +508,26 @@ export function useMezoTx(onDone?: () => void) {
   return { state, send, reset, busy: state.status === 'wallet' || state.status === 'pending' };
 }
 
+// Plain-language versions of common MUSD protocol reverts.
+const KNOWN_ERRORS: [RegExp, string][] = [
+  [
+    /troves with ICR < MCR/i,
+    'A loan is waiting to be liquidated, which pauses Stability Pool withdrawals. Try again in a few minutes.',
+  ],
+  [
+    /ICR < MCR|ICR < CCR|TCR < CCR/i,
+    'This would leave your loan under the minimum collateral ratio.',
+  ],
+  [/net debt must be greater than minimum/i, 'Your loan would fall below the minimum debt.'],
+  [/insufficient (MUSD )?balance|exceeds balance/i, 'Not enough MUSD in your wallet.'],
+  [/insufficient funds/i, 'Not enough BTC for this amount plus gas.'],
+];
+
 export function readableError(error: unknown): string {
   const e = error as { shortMessage?: string; message?: string; cause?: { reason?: string } };
   const text = e?.cause?.reason || e?.shortMessage || e?.message || 'Something went wrong.';
   if (/user rejected|denied/i.test(text)) return 'You rejected the request in your wallet.';
+  for (const [pattern, message] of KNOWN_ERRORS) if (pattern.test(text)) return message;
   return text.split('\n')[0];
 }
 
@@ -422,39 +553,51 @@ export function useVaultDeposited(account?: Address) {
     refetchInterval: 60_000,
     queryFn: async () => {
       const latest = await client!.getBlockNumber();
+      type Ev = { block: bigint; logIndex: number; shares: bigint; assets: bigint };
       const [deposits, withdrawals] = await Promise.all([
-        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
-            args: { receiver: account },
-            fromBlock,
-            toBlock,
-          })
+        cachedChunked<Ev>(
+          `vault-deposits.${mezo.earnVault}.${account}`,
+          mezo.earnVaultDeployBlock,
+          latest,
+          async (fromBlock, toBlock) =>
+            (
+              await client!.getLogs({
+                address: mezo.earnVault,
+                event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
+                args: { receiver: account },
+                fromBlock,
+                toBlock,
+              })
+            ).map((l) => ({
+              block: l.blockNumber,
+              logIndex: l.logIndex,
+              shares: l.args.shares ?? 0n,
+              assets: l.args.assets ?? 0n,
+            }))
         ),
-        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
-            args: { owner: account },
-            fromBlock,
-            toBlock,
-          })
+        cachedChunked<Ev>(
+          `vault-withdrawals.${mezo.earnVault}.${account}`,
+          mezo.earnVaultDeployBlock,
+          latest,
+          async (fromBlock, toBlock) =>
+            (
+              await client!.getLogs({
+                address: mezo.earnVault,
+                event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
+                args: { owner: account },
+                fromBlock,
+                toBlock,
+              })
+            ).map((l) => ({
+              block: l.blockNumber,
+              logIndex: l.logIndex,
+              shares: -(l.args.shares ?? 0n),
+              assets: 0n,
+            }))
         ),
       ]);
-      const events = [
-        ...deposits.map((l) => ({
-          order: [l.blockNumber, l.logIndex] as const,
-          shares: l.args.shares ?? 0n,
-          assets: l.args.assets ?? 0n,
-        })),
-        ...withdrawals.map((l) => ({
-          order: [l.blockNumber, l.logIndex] as const,
-          shares: -(l.args.shares ?? 0n),
-          assets: 0n,
-        })),
-      ].sort((a, b) =>
-        a.order[0] === b.order[0] ? a.order[1] - b.order[1] : Number(a.order[0] - b.order[0])
+      const events = [...deposits, ...withdrawals].sort((a, b) =>
+        a.block === b.block ? a.logIndex - b.logIndex : Number(a.block - b.block)
       );
       let shares = 0n;
       let cost = 0n;

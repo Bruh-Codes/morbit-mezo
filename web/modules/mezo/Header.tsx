@@ -9,13 +9,14 @@ import { usePathname } from 'next/navigation';
 import { useContext } from 'react';
 import { useAccount, useSwitchChain } from 'wagmi';
 
-import { MEZO_TESTNET_ID } from './config';
+import { mezo, MEZO_TESTNET_ID } from './config';
 
 const NAV = [
   { href: '/', label: 'Overview' },
   { href: '/dashboard/', label: 'Dashboard' },
   { href: '/borrow/', label: 'Borrow' },
   { href: '/earn/', label: 'Earn' },
+  ...(mezo.loopFactory ? [{ href: '/loop/', label: 'Loop' }] : []),
   { href: '/history/', label: 'Activity' },
 ];
 

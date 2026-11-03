@@ -6,7 +6,8 @@ import { ConnectKitButton } from 'connectkit';
 import Link from 'next/link';
 import { useAccount, useSwitchChain } from 'wagmi';
 
-import { mezo, MEZO_TESTNET_ID } from './config';
+import { AT_RISK, EARN, mezo, MEZO_TESTNET_ID } from './config';
+import { fmtRatio } from './format';
 import { TroveStatus, useUserPosition } from './hooks';
 
 type Step = { title: string; cta: string; href?: string; external?: boolean };
@@ -22,10 +23,22 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
       href: mezo.faucetUrl,
       external: true,
     };
+  if (hasTrove && trove.icr !== undefined && trove.icr < AT_RISK)
+    return {
+      title: `Your loan is at ${fmtRatio(trove.icr)}. Add BTC or repay to stay safe`,
+      cta: 'Add BTC',
+      href: '/borrow/?action=addColl',
+    };
+  if (position.legacy)
+    return {
+      title: `Move your Simple Earn deposit to ${EARN.name}`,
+      cta: 'Move',
+      href: '/earn/',
+    };
   if (!hasTrove) return { title: 'Borrow MUSD with your BTC', cta: 'Borrow', href: '/borrow/' };
   if (mezo.earnVault && (musdBalance ?? 0n) > 0n)
     return (vault.shares ?? 0n) > 0n
-      ? { title: 'Add your idle MUSD to Simple Earn', cta: 'Deposit more', href: '/earn/' }
+      ? { title: `Add your idle MUSD to ${EARN.name}`, cta: 'Deposit more', href: '/earn/' }
       : { title: 'Put your MUSD to work', cta: 'Deposit', href: '/earn/' };
   if ((vault.shares ?? 0n) > 0n)
     return { title: 'Track your positions', cta: 'Dashboard', href: '/dashboard/' };

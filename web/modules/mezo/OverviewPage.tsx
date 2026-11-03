@@ -4,7 +4,7 @@ import { ArrowForward } from '@mui/icons-material';
 import { Box, Button, Grid, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 
-import { CCR } from './config';
+import { CCR, EARN, mezo } from './config';
 import { btcValue, fmtRatio, fmtToken, fmtUsd } from './format';
 import { useMusdSystem, useUserPosition } from './hooks';
 import { INFO } from './info';
@@ -82,8 +82,12 @@ export function OverviewPage() {
           <Grid item xs={12} md={6}>
             <ProductCard
               icon="mvMUSD"
-              title="Simple Earn"
-              body="Deposit MUSD. Earn BTC when loans get liquidated."
+              title={EARN.name}
+              body={
+                mezo.autoEarn
+                  ? 'Deposit MUSD. Liquidation gains compound automatically, plus MEZO rewards.'
+                  : 'Deposit MUSD. Earn BTC when loans get liquidated.'
+              }
               href="/earn/"
               cta="Deposit MUSD"
             >
@@ -99,11 +103,23 @@ export function OverviewPage() {
                   vault?.sharePrice !== undefined ? fmtToken('MUSD', vault.sharePrice, 4) : '—'
                 }
               />
-              <Row
-                label="Stability Pool"
-                info={INFO['Stability Pool']}
-                value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
-              />
+              {mezo.autoEarn ? (
+                <Row
+                  label="MEZO rewards"
+                  info={INFO['MEZO rewards']}
+                  value={
+                    system.autoEarn?.rewardApr !== undefined
+                      ? `${fmtRatio(system.autoEarn.rewardApr, 1)} APR`
+                      : '—'
+                  }
+                />
+              ) : (
+                <Row
+                  label="Stability Pool"
+                  info={INFO['Stability Pool']}
+                  value={fmtToken('MUSD', system.stabilityPoolDeposits, 0)}
+                />
+              )}
             </ProductCard>
           </Grid>
         </Grid>
