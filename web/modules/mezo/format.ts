@@ -84,3 +84,14 @@ export function fmtPlain(value: bigint) {
 export function fmtToken(symbol: string, value?: bigint, maxDigits = 4) {
   return value === undefined ? '—' : `${fmtAmount(value, maxDigits)} ${symbol}`;
 }
+
+/**
+ * MEZO reward rate for display. While the vault is tiny the APR is a meaningless four-digit number,
+ * so above 500% show the daily emission instead.
+ */
+export function fmtRewards(stats?: { rewardApr?: bigint; rewardRate?: bigint }) {
+  if (stats?.rewardApr === undefined) return '—';
+  if (stats.rewardApr > 5n * 10n ** 18n && stats.rewardRate !== undefined)
+    return `${fmtAmount(stats.rewardRate * 86400n, 1)} MEZO/day`;
+  return `${fmtRatio(stats.rewardApr, 1)} APR`;
+}

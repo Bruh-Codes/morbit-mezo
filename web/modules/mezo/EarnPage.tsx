@@ -22,7 +22,7 @@ import {
   btcValue,
   fmtAmount,
   fmtPlain,
-  fmtRatio,
+  fmtRewards,
   fmtToken,
   fmtUsd,
   parseAmount,
@@ -79,7 +79,7 @@ export function EarnPage() {
               loading={system.isLoading}
               label="MEZO rewards"
               info={INFO['MEZO rewards']}
-              value={auto?.rewardApr !== undefined ? `${fmtRatio(auto.rewardApr, 1)} APR` : '—'}
+              value={fmtRewards(auto)}
               hint={auto?.rewardApr === undefined ? 'No reward stream running' : undefined}
             />
           ) : (
@@ -151,7 +151,8 @@ function AutoEarnPanel({
   const harvestTx = useMezoTx(refresh);
   const auto = system.autoEarn;
   const pendingBtc = system.vault?.totalBtc ?? 0n;
-  const canHarvest = auto?.minHarvestBtc !== undefined && pendingBtc >= auto.minHarvestBtc;
+  const canHarvest =
+    auto?.minHarvestBtc !== undefined && pendingBtc > 0n && pendingBtc >= auto.minHarvestBtc;
   const earned = position.vault.mezoEarned ?? 0n;
   const lastHarvest = auto?.lastHarvestAt ? Number(auto.lastHarvestAt) * 1000 : undefined;
 
@@ -224,6 +225,8 @@ function AutoEarnPanel({
                 ? 'Compounding…'
                 : canHarvest
                 ? 'Compound now'
+                : auto?.minHarvestBtc
+                ? `Compounds once gains reach ${fmtAmount(auto.minHarvestBtc, 6)} BTC`
                 : 'Nothing to compound'}
             </Button>
           )}

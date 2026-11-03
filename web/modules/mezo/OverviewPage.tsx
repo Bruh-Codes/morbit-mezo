@@ -5,7 +5,7 @@ import { Box, Button, Grid, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 
 import { CCR, EARN, mezo } from './config';
-import { btcValue, fmtRatio, fmtToken, fmtUsd } from './format';
+import { btcValue, fmtRatio, fmtRewards, fmtToken, fmtUsd } from './format';
 import { useMusdSystem, useUserPosition } from './hooks';
 import { INFO } from './info';
 import { NextStep } from './NextStep';
@@ -107,11 +107,7 @@ export function OverviewPage() {
                 <Row
                   label="MEZO rewards"
                   info={INFO['MEZO rewards']}
-                  value={
-                    system.autoEarn?.rewardApr !== undefined
-                      ? `${fmtRatio(system.autoEarn.rewardApr, 1)} APR`
-                      : '—'
-                  }
+                  value={fmtRewards(system.autoEarn)}
                 />
               ) : (
                 <Row
