@@ -12,6 +12,7 @@ const dep = deployment as typeof deployment & {
   autoEarnVaultDeployBlock?: number;
   mezoRouter?: string;
   poolFactory?: string;
+  loopFactory?: string;
 };
 const simpleEarnVault = asAddress(dep.earnVault);
 const autoEarnVault = asAddress(dep.autoEarnVault);
@@ -51,6 +52,7 @@ export const mezo = {
   legacyVault: autoEarnVault ? simpleEarnVault : undefined,
   mezoRouter: asAddress(dep.mezoRouter),
   poolFactory: asAddress(dep.poolFactory),
+  loopFactory: asAddress(dep.loopFactory),
 };
 
 /** Product and share names for the active Earn vault. */

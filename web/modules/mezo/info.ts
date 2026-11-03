@@ -22,5 +22,8 @@ export const INFO: Record<string, string> = {
     'Yearly MEZO streamed to depositors ÷ vault value, at the Mezo Pools MEZO price. Changes as deposits change.',
   'BTC gains to compound':
     'BTC the vault received from liquidations. Compounding swaps it to MUSD on Mezo Pools at no worse than 3% under the oracle price. Anyone can trigger it.',
+  'Mezo Pools price': 'What 1 BTC costs in MUSD on the Mezo Pools BTC/MUSD pool right now.',
+  'BTC exposure': 'All BTC in the loop: your deposit plus the BTC bought with borrowed MUSD.',
+  'Loop net value': 'BTC exposure at the oracle price minus debt. This is what you own.',
   Withdrawable: 'What you get if you withdraw all shares now.',
 };

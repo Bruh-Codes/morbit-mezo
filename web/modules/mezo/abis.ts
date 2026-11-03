@@ -75,3 +75,17 @@ export const mezoRouterAbi = parseAbi([
   'struct Route { address from; address to; bool stable; address factory; }',
   'function getAmountsOut(uint256 amountIn, Route[] routes) view returns (uint256[] amounts)',
 ]);
+
+export const loopFactoryAbi = parseAbi([
+  'function accountOf(address owner) view returns (address)',
+  'function openLoop(uint256 debtAmount, uint256 minBtcOut, address[4] hints) payable returns (address)',
+]);
+
+export const loopAccountAbi = parseAbi([
+  'function openLoop(uint256 debtAmount, uint256 minBtcOut, address[4] hints) payable',
+  'function addCollateral(address upperHint, address lowerHint) payable',
+  'function closeLoop(uint256 btcToSell, uint256 minMusdOut, address upperHint, address lowerHint)',
+  'function sweep() returns (uint256 btcOut, uint256 musdOut)',
+  'event LoopOpened(uint256 collateralIn, uint256 debt, uint256 btcBought)',
+  'event LoopClosed(uint256 btcSold, uint256 musdBought, uint256 btcOut, uint256 musdOut)',
+]);
