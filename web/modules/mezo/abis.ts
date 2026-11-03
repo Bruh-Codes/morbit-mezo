@@ -56,3 +56,22 @@ export const earnVaultAbi = parseAbi([
   'event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares)',
   'event Withdraw(address indexed caller, address indexed receiver, address indexed owner, uint256 shares, uint256 musdOut, uint256 btcOut)',
 ]);
+
+/** Auto Earn (MorbitEarnVaultV2): the Simple Earn interface plus compounding and MEZO rewards. */
+export const autoEarnVaultAbi = parseAbi([
+  'function harvest(uint256 minMusdOut) returns (uint256 musdOut)',
+  'function claimRewards() returns (uint256)',
+  'function earned(address account) view returns (uint256)',
+  'function rewardRate() view returns (uint256)',
+  'function periodFinish() view returns (uint256)',
+  'function minHarvestBtc() view returns (uint256)',
+  'function totalCompoundedMusd() view returns (uint256)',
+  'function lastHarvestAt() view returns (uint256)',
+  'event Harvest(address indexed caller, uint256 btcIn, uint256 musdOut)',
+  'event RewardPaid(address indexed account, uint256 amount)',
+]);
+
+export const mezoRouterAbi = parseAbi([
+  'struct Route { address from; address to; bool stable; address factory; }',
+  'function getAmountsOut(uint256 amountIn, Route[] routes) view returns (uint256[] amounts)',
+]);

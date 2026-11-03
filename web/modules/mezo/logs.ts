@@ -44,7 +44,7 @@ export async function cachedChunked<T extends { block: bigint }>(
   to: bigint,
   query: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>
 ): Promise<T[]> {
-  const storageKey = `morbit.logs.${key}`;
+  const storageKey = `morbit.logs.v2.${key}`;
   let cached: Cache<T> | undefined;
   try {
     const raw = localStorage.getItem(storageKey);

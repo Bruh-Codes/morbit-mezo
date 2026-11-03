@@ -6,6 +6,16 @@ const asAddress = (value: string | null | undefined): Address | undefined =>
 
 export const MEZO_TESTNET_ID = 31611;
 
+// Fields added by later deploy scripts are optional in the JSON.
+const dep = deployment as typeof deployment & {
+  autoEarnVault?: string;
+  autoEarnVaultDeployBlock?: number;
+  mezoRouter?: string;
+  poolFactory?: string;
+};
+const simpleEarnVault = asAddress(dep.earnVault);
+const autoEarnVault = asAddress(dep.autoEarnVault);
+
 export const mezoTestnet = defineChain({
   id: MEZO_TESTNET_ID,
   name: 'Mezo Testnet',
@@ -32,9 +42,21 @@ export const mezo = {
   // Read from TroveManager at runtime when the deploy script has not recorded them.
   stabilityPool: asAddress(deployment.stabilityPool),
   sortedTroves: asAddress(deployment.sortedTroves),
-  earnVault: asAddress(deployment.earnVault),
-  earnVaultDeployBlock: BigInt(deployment.earnVaultDeployBlock || 0),
+  // The Earn page uses Auto Earn once it is deployed; Simple Earn then stays open for withdrawals.
+  earnVault: autoEarnVault ?? simpleEarnVault,
+  earnVaultDeployBlock: BigInt(
+    (autoEarnVault ? dep.autoEarnVaultDeployBlock : dep.earnVaultDeployBlock) || 0
+  ),
+  autoEarn: !!autoEarnVault,
+  legacyVault: autoEarnVault ? simpleEarnVault : undefined,
+  mezoRouter: asAddress(dep.mezoRouter),
+  poolFactory: asAddress(dep.poolFactory),
 };
+
+/** Product and share names for the active Earn vault. */
+export const EARN = mezo.autoEarn
+  ? { name: 'Auto Earn', share: 'maMUSD' }
+  : { name: 'Simple Earn', share: 'mvMUSD' };
 
 export const ZERO = zeroAddress;
 

@@ -5,9 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getAbiItem } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 
-import { borrowerOperationsAbi, earnVaultAbi } from './abis';
+import { autoEarnVaultAbi, borrowerOperationsAbi, earnVaultAbi } from './abis';
 import { Address } from './Address';
-import { mezo, MEZO_TESTNET_ID } from './config';
+import { EARN, mezo, MEZO_TESTNET_ID } from './config';
+import deployment from 'ui-config/mezoDeployment.json';
 import { fmtAmount, timeAgo } from './format';
 import { cachedChunked } from './logs';
 import { useNow } from './hooks';
@@ -24,8 +25,9 @@ type ChainEvent = {
 
 // Loan history is read from a little before Morbit launched. Results are cached in the
 // browser, so only the first load scans the whole range.
-const TROVE_HISTORY_START =
-  mezo.earnVaultDeployBlock > 100_000n ? mezo.earnVaultDeployBlock - 100_000n : 0n;
+// Simple Earn's deploy block, for its history after Auto Earn takes over the Earn page.
+const LEGACY_VAULT_BLOCK = BigInt(deployment.earnVaultDeployBlock || 0);
+const TROVE_HISTORY_START = LEGACY_VAULT_BLOCK > 100_000n ? LEGACY_VAULT_BLOCK - 100_000n : 0n;
 
 const TROVE_OPS = ['Opened loan', 'Closed loan', 'Updated loan', 'Refinanced loan'];
 
@@ -39,18 +41,20 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
     queryFn: async (): Promise<ChainEvent[]> => {
       const latest = await client!.getBlockNumber();
 
-      const vaultEvents = async (): Promise<ChainEvent[]> => {
-        if (!mezo.earnVault) return [];
-        const from = mezo.earnVaultDeployBlock;
+      const vaultHistory = async (
+        vaultAddress: `0x${string}`,
+        from: bigint,
+        name: string
+      ): Promise<ChainEvent[]> => {
         const [deposits, withdrawals] = await Promise.all([
           cachedChunked<ChainEvent>(
-            `history-deposits.${mezo.earnVault}.${account}`,
+            `history-deposits.${vaultAddress}.${account}`,
             from,
             latest,
             async (fromBlock, toBlock) =>
               (
                 await client!.getLogs({
-                  address: mezo.earnVault,
+                  address: vaultAddress,
                   event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
                   args: { receiver: account },
                   fromBlock,
@@ -59,22 +63,19 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
               ).map((log) => ({
                 hash: log.transactionHash,
                 product: 'Earn' as const,
-                title: 'Deposited',
-                detail: `${fmtAmount(log.args.assets, 2)} MUSD → ${fmtAmount(
-                  log.args.shares,
-                  4
-                )} mvMUSD`,
+                title: `Deposited to ${name}`,
+                detail: `${fmtAmount(log.args.assets, 2)} MUSD`,
                 block: log.blockNumber,
               }))
           ),
           cachedChunked<ChainEvent>(
-            `history-withdrawals.${mezo.earnVault}.${account}`,
+            `history-withdrawals.${vaultAddress}.${account}`,
             from,
             latest,
             async (fromBlock, toBlock) =>
               (
                 await client!.getLogs({
-                  address: mezo.earnVault,
+                  address: vaultAddress,
                   event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
                   args: { owner: account },
                   fromBlock,
@@ -83,16 +84,47 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
               ).map((log) => ({
                 hash: log.transactionHash,
                 product: 'Earn' as const,
-                title: 'Withdrew',
-                detail: `${fmtAmount(log.args.musdOut, 2)} MUSD + ${fmtAmount(
-                  log.args.btcOut,
-                  6
-                )} BTC`,
+                title: `Withdrew from ${name}`,
+                detail: `${fmtAmount(log.args.musdOut, 2)} MUSD${
+                  log.args.btcOut ? ` + ${fmtAmount(log.args.btcOut, 6)} BTC` : ''
+                }`,
                 block: log.blockNumber,
               }))
           ),
         ]);
         return [...deposits, ...withdrawals];
+      };
+
+      const vaultEvents = async (): Promise<ChainEvent[]> => {
+        if (!mezo.earnVault) return [];
+        const parts = [vaultHistory(mezo.earnVault, mezo.earnVaultDeployBlock, EARN.name)];
+        if (mezo.legacyVault)
+          parts.push(vaultHistory(mezo.legacyVault, LEGACY_VAULT_BLOCK, 'Simple Earn'));
+        if (mezo.autoEarn)
+          parts.push(
+            cachedChunked<ChainEvent>(
+              `history-rewards.${mezo.earnVault}.${account}`,
+              mezo.earnVaultDeployBlock,
+              latest,
+              async (fromBlock, toBlock) =>
+                (
+                  await client!.getLogs({
+                    address: mezo.earnVault,
+                    event: getAbiItem({ abi: autoEarnVaultAbi, name: 'RewardPaid' }),
+                    args: { account },
+                    fromBlock,
+                    toBlock,
+                  })
+                ).map((log) => ({
+                  hash: log.transactionHash,
+                  product: 'Earn' as const,
+                  title: 'Claimed MEZO',
+                  detail: `${fmtAmount(log.args.amount, 4)} MEZO`,
+                  block: log.blockNumber,
+                }))
+            )
+          );
+        return (await Promise.all(parts)).flat();
       };
 
       const troveEvents = async (): Promise<ChainEvent[]> => {
