@@ -9,7 +9,18 @@ A Telegram bot that watches MUSD loans and Morbit BTC loops on Mezo and messages
 - `/watch`, `/unwatch`, `/status`, `/threshold 170`. A link like `https://t.me/Morbit_testnet_bot?start=<address>` subscribes a wallet in one tap (the app's "Get alerts" button uses it).
 - With `KEEPER_PRIVATE_KEY` set, it liquidates loans under 110% (which unblocks Stability Pool withdrawals and pays depositors BTC) and compounds Auto Earn once its BTC gains reach the minimum, every 5 minutes. Anyone can call `harvest`, so this is a convenience, not a dependency.
 
-## Run
+## Run on Vercel (recommended)
+
+The web app also runs the bot, so it is always on and costs nothing extra. Code: `web/modules/alerts/` and `web/app/api/`.
+
+1. In the Vercel project, open **Storage**, add **Upstash for Redis** (free) and connect it. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+2. In **Settings → Environment Variables** add `TELEGRAM_BOT_TOKEN` (from @BotFather) and `CRON_SECRET` (any long random string). Optional: `KEEPER_PRIVATE_KEY` (a spare testnet wallet with a little BTC) and `APP_URL`. Redeploy.
+3. Open `https://<your-site>/api/telegram/setup/?key=<CRON_SECRET>` once. The bot now answers through the webhook.
+4. For the 5-minute checks, add the GitHub repository secrets `APP_URL` and `CRON_SECRET`. The `Alerts` workflow (`.github/workflows/alerts.yml`) calls `/api/alerts/check/` every 5 minutes.
+
+Telegram allows either the webhook or the local bot below, not both, so stop `npm start` once the webhook is set.
+
+## Run locally
 
 ```
 cd alerts
