@@ -18,6 +18,7 @@ import {
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 
+import { AlertsButton } from './AlertsButton';
 import { EARN, mezo, ratioColor } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
@@ -87,6 +88,7 @@ export function DashboardPage() {
         ) : (
           <Stack spacing={3}>
             <NextStep position={position} />
+            <AlertsButton fullWidth={false} />
             <Panel title="Your positions">
               <TableContainer sx={{ overflowX: 'auto' }}>
                 <Table size="small" sx={{ minWidth: 860, '& td, & th': { px: 1.5, py: 1.5 } }}>
