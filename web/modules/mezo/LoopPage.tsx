@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { type Address, maxUint256 } from 'viem';
 import { useAccount, useReadContracts } from 'wagmi';
 
+import { AlertsButton } from './AlertsButton';
 import { erc20Abi, loopAccountAbi, loopFactoryAbi, mezoRouterAbi, troveManagerAbi } from './abis';
 import { MCR, mezo, MEZO_TESTNET_ID, MUSD_GAS_COMPENSATION, ratioColor, ZERO } from './config';
 import {
@@ -502,6 +503,7 @@ function LoopSummary({ system, loop }: { system: System; loop: Loop }) {
         info={INFO['Liquidation price']}
         value={fmtUsd(liquidationPrice(coll, debt))}
       />
+      <AlertsButton />
     </Panel>
   );
 }

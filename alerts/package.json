@@ -1,0 +1,16 @@
+{
+  "name": "morbit-alerts",
+  "private": true,
+  "type": "module",
+  "description": "Telegram liquidation alerts for MUSD loans and Morbit BTC loops on Mezo, plus an optional Auto Earn keeper.",
+  "scripts": {
+    "start": "node bot.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "viem": "2.45.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

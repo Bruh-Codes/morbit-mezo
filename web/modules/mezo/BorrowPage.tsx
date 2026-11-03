@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 import { borrowerOperationsAbi } from './abis';
+import { AlertsButton } from './AlertsButton';
 import { CCR, MCR, mezo, MUSD_GAS_COMPENSATION, ZERO, ratioColor } from './config';
 import {
   btcValue,
@@ -157,6 +158,7 @@ function TroveSummary({
             : '—'
         }
       />
+      {active && <AlertsButton />}
       <Divider sx={{ my: 2 }} />
       <Row label="Wallet BTC" value={fmtAmount(position.btcBalance)} />
       <Row label="Wallet MUSD" value={fmtAmount(position.musdBalance, 2)} />
