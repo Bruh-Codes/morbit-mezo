@@ -87,7 +87,10 @@ Every number in the app comes live from Mezo testnet. There is no mock data. Eac
 
 | Contract | Address |
 |---|---|
-| **MorbitEarnVault** | [`0x8D6444887c22Eb1A32De4299E507C62EbAb4004A`](https://explorer.test.mezo.org/address/0x8D6444887c22Eb1A32De4299E507C62EbAb4004A) |
+| **Auto Earn** (MorbitEarnVaultV2) | [`0x23d80c8c231D7BF671AC54cd5854728535063254`](https://explorer.test.mezo.org/address/0x23d80c8c231D7BF671AC54cd5854728535063254) |
+| **MorbitLoopFactory** | [`0x1793939e946eaC24Db782c59AC848ec8112f333d`](https://explorer.test.mezo.org/address/0x1793939e946eaC24Db782c59AC848ec8112f333d) |
+| **MezoPoolsSwapper** | [`0x219cCC99aB55c001f9c48cEC3740d6a64518bD72`](https://explorer.test.mezo.org/address/0x219cCC99aB55c001f9c48cEC3740d6a64518bD72) |
+| **Simple Earn** (MorbitEarnVault) | [`0x8D6444887c22Eb1A32De4299E507C62EbAb4004A`](https://explorer.test.mezo.org/address/0x8D6444887c22Eb1A32De4299E507C62EbAb4004A) |
 | MUSD | [`0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503`](https://explorer.test.mezo.org/address/0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503) |
 | BorrowerOperations | [`0xCdF7028ceAB81fA0C6971208e83fa7872994beE5`](https://explorer.test.mezo.org/address/0xCdF7028ceAB81fA0C6971208e83fa7872994beE5) |
 | TroveManager | [`0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0`](https://explorer.test.mezo.org/address/0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0) |
@@ -102,6 +105,11 @@ These transactions prove the full flow works on chain:
 | Open loan: 0.04 BTC in, 2,001.8 MUSD debt | [`0xf267dffa…fb45`](https://explorer.test.mezo.org/tx/0xf267dffaa6f649f818a4df8009d027b30db7eb20c761d5fbb3023c219122fb45) |
 | Deposit 100 MUSD into Simple Earn | [`0xa50d20be…af5`](https://explorer.test.mezo.org/tx/0xa50d20bef8c5f6f92974e7da885b15b81fcaf799aa7077a06ffc4a1b86c9daf5) |
 | Withdraw 50 mvMUSD | [`0x248c2083…e269`](https://explorer.test.mezo.org/tx/0x248c20830c31c465f5390cf429704381e3850f09c8db9a9da2dedcc1ae7ae269) |
+| Wave 2: deploy Auto Earn | [`0x819bb787…c466`](https://explorer.test.mezo.org/tx/0x819bb78708aeebb4456b2c293d553b7fb36525b8c79052f8fc97ffd80e39c466) |
+| Wave 2: deploy the loop factory | [`0x3105068e…5366`](https://explorer.test.mezo.org/tx/0x3105068ed9615ea2467b9be75b6dd2f12e18ef87b11af14ab505572779f15366) |
+| Wave 2: seed 1 MUSD of dead shares | [`0x9078424f…aaed`](https://explorer.test.mezo.org/tx/0x9078424f1a5faa7ce5b9d7164c730bcad0deace3d1cef14e5a13075c8155aaed) |
+| Wave 2: stream 100 MEZO to Auto Earn over 14 days | [`0x24faf361…2813`](https://explorer.test.mezo.org/tx/0x24faf361233475aaa361e2bc3e17172656d02a6d402198c532bfa21140e82813) |
+| Wave 2: deposit 100 MUSD into Auto Earn | [`0x6907fc0c…580d`](https://explorer.test.mezo.org/tx/0x6907fc0c76dc5a1fe2ed528e0506cf15be0d00e21461ce634a2c16d615ad580d) |
 
 ## Run it locally
 
@@ -144,6 +152,8 @@ The smoke test locks 0.04 BTC by default (`SMOKE_COLL_BTC`), because the minimum
 | `yarn smoke:mezo` | Runs the full borrow → deposit → withdraw flow on chain |
 | `yarn deploy:wave2` | Deploys the swapper, Auto Earn and the loop factory, and seeds dead shares. Optional `REWARD_MEZO`, `REWARD_DAYS` |
 | `yarn smoke:auto-earn` | Deposit, harvest, claim and redeem against live Auto Earn |
+| `yarn finish:wave2` | Seeds Auto Earn and starts a MEZO stream (`REWARD_MEZO`) if `deploy:wave2` stopped early |
+| `yarn liquidate` | Liquidates loans under 110% (this unblocks Stability Pool withdrawals) and compounds Auto Earn |
 
 ### Deploy the web app
 

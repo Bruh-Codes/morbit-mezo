@@ -5,7 +5,7 @@ A Telegram bot that watches MUSD loans and Morbit BTC loops on Mezo and messages
 - Warns once when a position drops under your threshold (default 160%), again if it becomes critical (under 120%, or under 150% while Mezo is in recovery mode), and once more when it is back to safe. It never repeats the same alert.
 - Watches both the wallet's own loan and its Morbit BTC loop account.
 - `/watch`, `/unwatch`, `/status`, `/threshold 170`. A link like `https://t.me/<bot>?start=<address>` subscribes a wallet in one tap (the app's "Get alerts" button uses it).
-- With `KEEPER_PRIVATE_KEY` set, it compounds Auto Earn every 30 minutes once the vault's BTC gains reach the minimum. Anyone can call `harvest`, so this is a convenience, not a dependency.
+- With `KEEPER_PRIVATE_KEY` set, it liquidates loans under 110% (which unblocks Stability Pool withdrawals and pays depositors BTC) and compounds Auto Earn once its BTC gains reach the minimum, every 5 minutes. Anyone can call `harvest`, so this is a convenience, not a dependency.
 
 ## Run
 

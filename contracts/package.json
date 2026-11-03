@@ -10,7 +10,8 @@
     "deploy:auto-earn": "hardhat run scripts/deploy-auto-earn.js --network mezoTestnet",
     "smoke:auto-earn": "hardhat run scripts/smoke-auto-earn.js --network mezoTestnet",
     "deploy:wave2": "hardhat run scripts/deploy-auto-earn.js --network mezoTestnet",
-    "finish:wave2": "hardhat run scripts/finish-wave2.js --network mezoTestnet"
+    "finish:wave2": "hardhat run scripts/finish-wave2.js --network mezoTestnet",
+    "liquidate": "hardhat run scripts/liquidate.js --network mezoTestnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.13",

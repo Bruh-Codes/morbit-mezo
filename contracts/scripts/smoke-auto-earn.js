@@ -59,9 +59,14 @@ async function main() {
 
   const half = (await vault.balanceOf(me.address)) / 2n;
   const before = await musd.balanceOf(me.address);
-  const red = await vault.redeem(half, me.address, me.address);
-  await red.wait();
-  console.log(`Redeemed ${fmt(half)} maMUSD for ${fmt((await musd.balanceOf(me.address)) - before)} MUSD  ${link(red.hash)}`);
+  try {
+    const red = await vault.redeem(half, me.address, me.address);
+    await red.wait();
+    console.log(`Redeemed ${fmt(half)} maMUSD for ${fmt((await musd.balanceOf(me.address)) - before)} MUSD  ${link(red.hash)}`);
+  } catch (error) {
+    if (!String(error?.message).includes("ICR < MCR")) throw error;
+    console.log("Withdrawals are paused by MUSD while a loan under 110% waits to be liquidated. Run `npm run liquidate`, then try again.");
+  }
   console.log(`Vault value ${fmt(await vault.totalAssets())} MUSD, share price ${fmt(await vault.sharePrice())}`);
 }
 

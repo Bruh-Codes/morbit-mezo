@@ -27,6 +27,12 @@ export const abi = {
     'function getTroveDebt(address) view returns (uint256)',
     'function getEntireSystemColl() view returns (uint256)',
     'function getEntireSystemDebt() view returns (uint256)',
+    'function getCurrentICR(address,uint256) view returns (uint256)',
+    'function batchLiquidateTroves(address[])',
+  ]),
+  sortedTroves: parseAbi([
+    'function getLast() view returns (address)',
+    'function getPrev(address) view returns (address)',
   ]),
   priceFeed: parseAbi(['function fetchPrice() view returns (uint256)']),
   loopFactory: parseAbi(['function accountOf(address) view returns (address)']),

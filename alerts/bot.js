@@ -29,7 +29,7 @@ if (!TOKEN) {
 }
 const API = `https://api.telegram.org/bot${TOKEN}`;
 const CHECK_MS = Number(process.env.CHECK_EVERY_SECONDS || 60) * 1000;
-const KEEPER_MS = 30 * 60 * 1000;
+const KEEPER_MS = 5 * 60 * 1000;
 const DATA_FILE = process.env.DATA_FILE || path.resolve(here, 'data/subscriptions.json');
 const APP_URL = process.env.APP_URL || 'https://morbit-mezo.vercel.app';
 const DEFAULT_WARN = 16n * 10n ** 17n; // 160%
@@ -168,15 +168,44 @@ async function checkAll() {
   save(db);
 }
 
+// Troves under 110% block every Stability Pool withdrawal until someone liquidates them, and
+// liquidations are what pay Auto Earn its BTC gains. Liquidating is permissionless.
+async function liquidateUnderwater(wallet) {
+  const price = await client.readContract({ address: dep.priceFeed, abi: abi.priceFeed, functionName: 'fetchPrice' });
+  const targets = [];
+  let trove = await client.readContract({ address: dep.sortedTroves, abi: abi.sortedTroves, functionName: 'getLast' });
+  while (trove !== '0x0000000000000000000000000000000000000000' && targets.length < 20) {
+    const icr = await client.readContract({
+      address: dep.troveManager,
+      abi: abi.troveManager,
+      functionName: 'getCurrentICR',
+      args: [trove, price],
+    });
+    if (icr >= 11n * 10n ** 17n) break;
+    targets.push(trove);
+    trove = await client.readContract({ address: dep.sortedTroves, abi: abi.sortedTroves, functionName: 'getPrev', args: [trove] });
+  }
+  if (!targets.length) return;
+  const hash = await wallet.writeContract({
+    address: dep.troveManager,
+    abi: abi.troveManager,
+    functionName: 'batchLiquidateTroves',
+    args: [targets],
+  });
+  await client.waitForTransactionReceipt({ hash });
+  console.log(`Liquidated ${targets.length} trove(s): ${dep.explorerUrl}/tx/${hash}`);
+}
+
 async function keeper() {
   const key = process.env.KEEPER_PRIVATE_KEY;
   if (!key || !dep.autoEarnVault) return;
+  const wallet = createWalletClient({ chain, transport: http(), account: privateKeyToAccount(key) });
+  await liquidateUnderwater(wallet).catch((e) => console.error(`liquidate: ${e.shortMessage || e.message}`));
   const [btc, min] = await Promise.all([
     client.readContract({ address: dep.autoEarnVault, abi: abi.autoEarn, functionName: 'totalBtc' }),
     client.readContract({ address: dep.autoEarnVault, abi: abi.autoEarn, functionName: 'minHarvestBtc' }),
   ]);
   if (btc < min || btc === 0n) return;
-  const wallet = createWalletClient({ chain, transport: http(), account: privateKeyToAccount(key) });
   const hash = await wallet.writeContract({
     address: dep.autoEarnVault,
     abi: abi.autoEarn,
