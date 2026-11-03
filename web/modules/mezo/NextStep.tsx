@@ -6,7 +6,8 @@ import { ConnectKitButton } from 'connectkit';
 import Link from 'next/link';
 import { useAccount, useSwitchChain } from 'wagmi';
 
-import { mezo, MEZO_TESTNET_ID } from './config';
+import { AT_RISK, mezo, MEZO_TESTNET_ID } from './config';
+import { fmtRatio } from './format';
 import { TroveStatus, useUserPosition } from './hooks';
 
 type Step = { title: string; cta: string; href?: string; external?: boolean };
@@ -23,6 +24,12 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
       external: true,
     };
   if (!hasTrove) return { title: 'Borrow MUSD with your BTC', cta: 'Borrow', href: '/borrow/' };
+  if (trove.icr !== undefined && trove.icr < AT_RISK)
+    return {
+      title: `Your loan is at ${fmtRatio(trove.icr)}. Add BTC or repay to stay safe`,
+      cta: 'Add BTC',
+      href: '/borrow/?action=addColl',
+    };
   if (mezo.earnVault && (musdBalance ?? 0n) > 0n)
     return (vault.shares ?? 0n) > 0n
       ? { title: 'Add your idle MUSD to Simple Earn', cta: 'Deposit more', href: '/earn/' }

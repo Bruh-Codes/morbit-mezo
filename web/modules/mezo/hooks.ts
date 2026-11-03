@@ -22,7 +22,7 @@ import {
   troveManagerAbi,
 } from './abis';
 import { mezo, MEZO_TESTNET_ID, ZERO } from './config';
-import { chunked } from './logs';
+import { cachedChunked } from './logs';
 import { recordTx, updateTx } from './txHistory';
 
 const chainId = MEZO_TESTNET_ID;
@@ -393,10 +393,26 @@ export function useMezoTx(onDone?: () => void) {
   return { state, send, reset, busy: state.status === 'wallet' || state.status === 'pending' };
 }
 
+// Plain-language versions of common MUSD protocol reverts.
+const KNOWN_ERRORS: [RegExp, string][] = [
+  [
+    /troves with ICR < MCR/i,
+    'A loan is waiting to be liquidated, which pauses Stability Pool withdrawals. Try again in a few minutes.',
+  ],
+  [
+    /ICR < MCR|ICR < CCR|TCR < CCR/i,
+    'This would leave your loan under the minimum collateral ratio.',
+  ],
+  [/net debt must be greater than minimum/i, 'Your loan would fall below the minimum debt.'],
+  [/insufficient (MUSD )?balance|exceeds balance/i, 'Not enough MUSD in your wallet.'],
+  [/insufficient funds/i, 'Not enough BTC for this amount plus gas.'],
+];
+
 export function readableError(error: unknown): string {
   const e = error as { shortMessage?: string; message?: string; cause?: { reason?: string } };
   const text = e?.cause?.reason || e?.shortMessage || e?.message || 'Something went wrong.';
   if (/user rejected|denied/i.test(text)) return 'You rejected the request in your wallet.';
+  for (const [pattern, message] of KNOWN_ERRORS) if (pattern.test(text)) return message;
   return text.split('\n')[0];
 }
 
@@ -422,39 +438,51 @@ export function useVaultDeposited(account?: Address) {
     refetchInterval: 60_000,
     queryFn: async () => {
       const latest = await client!.getBlockNumber();
+      type Ev = { block: bigint; logIndex: number; shares: bigint; assets: bigint };
       const [deposits, withdrawals] = await Promise.all([
-        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
-            args: { receiver: account },
-            fromBlock,
-            toBlock,
-          })
+        cachedChunked<Ev>(
+          `vault-deposits.${mezo.earnVault}.${account}`,
+          mezo.earnVaultDeployBlock,
+          latest,
+          async (fromBlock, toBlock) =>
+            (
+              await client!.getLogs({
+                address: mezo.earnVault,
+                event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
+                args: { receiver: account },
+                fromBlock,
+                toBlock,
+              })
+            ).map((l) => ({
+              block: l.blockNumber,
+              logIndex: l.logIndex,
+              shares: l.args.shares ?? 0n,
+              assets: l.args.assets ?? 0n,
+            }))
         ),
-        chunked(mezo.earnVaultDeployBlock, latest, (fromBlock, toBlock) =>
-          client!.getLogs({
-            address: mezo.earnVault,
-            event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
-            args: { owner: account },
-            fromBlock,
-            toBlock,
-          })
+        cachedChunked<Ev>(
+          `vault-withdrawals.${mezo.earnVault}.${account}`,
+          mezo.earnVaultDeployBlock,
+          latest,
+          async (fromBlock, toBlock) =>
+            (
+              await client!.getLogs({
+                address: mezo.earnVault,
+                event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
+                args: { owner: account },
+                fromBlock,
+                toBlock,
+              })
+            ).map((l) => ({
+              block: l.blockNumber,
+              logIndex: l.logIndex,
+              shares: -(l.args.shares ?? 0n),
+              assets: 0n,
+            }))
         ),
       ]);
-      const events = [
-        ...deposits.map((l) => ({
-          order: [l.blockNumber, l.logIndex] as const,
-          shares: l.args.shares ?? 0n,
-          assets: l.args.assets ?? 0n,
-        })),
-        ...withdrawals.map((l) => ({
-          order: [l.blockNumber, l.logIndex] as const,
-          shares: -(l.args.shares ?? 0n),
-          assets: 0n,
-        })),
-      ].sort((a, b) =>
-        a.order[0] === b.order[0] ? a.order[1] - b.order[1] : Number(a.order[0] - b.order[0])
+      const events = [...deposits, ...withdrawals].sort((a, b) =>
+        a.block === b.block ? a.logIndex - b.logIndex : Number(a.block - b.block)
       );
       let shares = 0n;
       let cost = 0n;

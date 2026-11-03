@@ -1,11 +1,21 @@
 'use client';
 
-import { Alert, Box, Button, Divider, Grid, Link as MuiLink, Stack, Tab, Tabs } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Divider,
+  Grid,
+  Link as MuiLink,
+  Stack,
+  Tab,
+  Tabs,
+} from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 import { borrowerOperationsAbi } from './abis';
-import { CCR, MCR, mezo, MUSD_GAS_COMPENSATION, ZERO } from './config';
+import { CCR, MCR, mezo, MUSD_GAS_COMPENSATION, ZERO, ratioColor } from './config';
 import {
   btcValue,
   collateralRatio,
@@ -37,13 +47,6 @@ const WAD = 10n ** 18n;
 const GAS_RESERVE = 10n ** 14n;
 // "Safe max" borrows down to a 200% collateral ratio.
 const SAFE_RATIO = 2n * 10n ** 18n;
-
-function ratioColor(ratio?: bigint) {
-  if (ratio === undefined) return 'text.primary';
-  if (ratio < MCR) return 'error.main';
-  if (ratio < CCR) return 'warning.main';
-  return 'success.main';
-}
 
 export function BorrowPage() {
   const { address } = useAccount();
@@ -335,6 +338,12 @@ function ManageTrove({
     position.btcBalance !== undefined && position.btcBalance > GAS_RESERVE
       ? position.btcBalance - GAS_RESERVE
       : 0n;
+  // Extra MUSD that keeps the loan at SAFE_RATIO after the borrowing fee.
+  const safeMore = (() => {
+    if (!system.btcPrice || system.borrowingRate === undefined) return 0n;
+    const cap = (coll * system.btcPrice) / SAFE_RATIO;
+    return cap > debt ? ((cap - debt) * WAD) / (WAD + system.borrowingRate) : 0n;
+  })();
 
   const error = (() => {
     if (action === 'close') {
@@ -440,7 +449,16 @@ function ManageTrove({
         balanceLabel="In loan"
       />
     ),
-    borrow: <AmountField label="Borrow more" symbol="MUSD" value={text} onChange={setText} />,
+    borrow: (
+      <AmountField
+        label="Borrow more"
+        symbol="MUSD"
+        value={text}
+        onChange={setText}
+        maxLabel="Safe max"
+        onMax={safeMore > 0n ? () => setText(fmtPlain(safeMore)) : undefined}
+      />
+    ),
     repay: (
       <>
         <AmountField

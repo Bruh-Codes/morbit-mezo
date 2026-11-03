@@ -1,6 +1,16 @@
 'use client';
 
-import { Alert, Box, Grid, Link as MuiLink, Stack, Tab, Tabs, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Grid,
+  Link as MuiLink,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
 import { useEffect, useState } from 'react';
 import { maxUint256 } from 'viem';
 import { useAccount } from 'wagmi';
@@ -223,17 +233,34 @@ function Withdraw({
 }) {
   const { address } = useAccount();
   const [text, setText] = useState('');
+  // A percentage pick redeems an exact share count, so 100% never leaves dust behind.
+  const [pick, setPick] = useState<number | undefined>();
   const tx = useMezoTx(() => {
     position.refetch();
     system.refetch();
   });
   const shares = position.vault.shares ?? 0n;
+  const value = position.vault.value ?? 0n;
   const amount = parseAmount(text) ?? 0n;
-  const portion = (value?: bigint) =>
-    value !== undefined && shares > 0n ? (value * amount) / shares : undefined;
+  const sharesToRedeem =
+    pick !== undefined
+      ? (shares * BigInt(pick)) / 100n
+      : value > 0n
+      ? (amount * shares) / value
+      : 0n;
+  const portion = (out?: bigint) =>
+    out !== undefined && shares > 0n ? (out * sharesToRedeem) / shares : undefined;
   const musdOut = portion(position.vault.musdOut);
   const btcOut = portion(position.vault.btcOut);
-  const error = amount > shares ? 'You do not hold that many mvMUSD.' : undefined;
+  const error =
+    pick === undefined && amount > value && value > 0n
+      ? `You can withdraw up to ${fmtUsd(value)}.`
+      : undefined;
+
+  const choose = (pct: number) => {
+    setPick(pct);
+    setText(fmtPlain((value * BigInt(pct)) / 100n));
+  };
 
   const withdraw = async () => {
     const done = await tx.send(
@@ -242,24 +269,42 @@ function Withdraw({
         address: mezo.earnVault!,
         abi: earnVaultAbi,
         functionName: 'redeem',
-        args: [amount, address!, address!],
+        args: [sharesToRedeem, address!, address!],
       },
-      fmtToken('mvMUSD', amount, 4)
+      `${fmtAmount(musdOut, 2)} MUSD${btcOut ? ` + ${fmtAmount(btcOut, 6)} BTC` : ''}`
     );
-    if (done) setText('');
+    if (done) {
+      setText('');
+      setPick(undefined);
+    }
   };
 
   return (
     <Stack spacing={2.5}>
       <AmountField
         label="Withdraw"
-        symbol="mvMUSD"
+        symbol="MUSD"
         value={text}
-        onChange={setText}
-        balance={shares}
-        balanceLabel="Your shares"
-        onMax={() => setText(fmtPlain(shares))}
+        onChange={(next) => {
+          setText(next);
+          setPick(undefined);
+        }}
+        balance={value}
+        balanceLabel="Your position"
       />
+      <Stack direction="row" spacing={1}>
+        {[25, 50, 75, 100].map((pct) => (
+          <Button
+            key={pct}
+            size="small"
+            variant={pick === pct ? 'contained' : 'outlined'}
+            onClick={() => choose(pct)}
+            disabled={!shares}
+          >
+            {pct === 100 ? 'All' : `${pct}%`}
+          </Button>
+        ))}
+      </Stack>
       <Box>
         <Row label="You receive MUSD" value={fmtToken('MUSD', musdOut, 2)} />
         <Row
@@ -270,7 +315,7 @@ function Withdraw({
       </Box>
       {error && <Alert severity="warning">{error}</Alert>}
       <TxNotice state={tx.state} />
-      <SubmitButton busy={tx.busy} disabled={!amount || !!error} onClick={withdraw}>
+      <SubmitButton busy={tx.busy} disabled={!sharesToRedeem || !!error} onClick={withdraw}>
         Withdraw
       </SubmitButton>
     </Stack>

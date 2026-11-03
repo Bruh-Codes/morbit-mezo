@@ -9,7 +9,7 @@ import { borrowerOperationsAbi, earnVaultAbi } from './abis';
 import { Address } from './Address';
 import { mezo, MEZO_TESTNET_ID } from './config';
 import { fmtAmount, timeAgo } from './format';
-import { chunked } from './logs';
+import { cachedChunked } from './logs';
 import { useNow } from './hooks';
 import { useTxHistory } from './txHistory';
 import { ConnectPrompt, PageContainer, PageTop, Panel } from './ui';
@@ -22,8 +22,10 @@ type ChainEvent = {
   block: bigint;
 };
 
-// Recent trove history only; older trove actions sent from Morbit are also kept locally.
-const TROVE_LOOKBACK = 60_000n;
+// Loan history is read from a little before Morbit launched. Results are cached in the
+// browser, so only the first load scans the whole range.
+const TROVE_HISTORY_START =
+  mezo.earnVaultDeployBlock > 100_000n ? mezo.earnVaultDeployBlock - 100_000n : 0n;
 
 const TROVE_OPS = ['Opened loan', 'Closed loan', 'Updated loan', 'Refinanced loan'];
 
@@ -41,70 +43,86 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
         if (!mezo.earnVault) return [];
         const from = mezo.earnVaultDeployBlock;
         const [deposits, withdrawals] = await Promise.all([
-          chunked(from, latest, (fromBlock, toBlock) =>
-            client!.getLogs({
-              address: mezo.earnVault,
-              event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
-              args: { receiver: account },
-              fromBlock,
-              toBlock,
-            })
+          cachedChunked<ChainEvent>(
+            `history-deposits.${mezo.earnVault}.${account}`,
+            from,
+            latest,
+            async (fromBlock, toBlock) =>
+              (
+                await client!.getLogs({
+                  address: mezo.earnVault,
+                  event: getAbiItem({ abi: earnVaultAbi, name: 'Deposit' }),
+                  args: { receiver: account },
+                  fromBlock,
+                  toBlock,
+                })
+              ).map((log) => ({
+                hash: log.transactionHash,
+                product: 'Earn' as const,
+                title: 'Deposited',
+                detail: `${fmtAmount(log.args.assets, 2)} MUSD → ${fmtAmount(
+                  log.args.shares,
+                  4
+                )} mvMUSD`,
+                block: log.blockNumber,
+              }))
           ),
-          chunked(from, latest, (fromBlock, toBlock) =>
-            client!.getLogs({
-              address: mezo.earnVault,
-              event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
-              args: { owner: account },
-              fromBlock,
-              toBlock,
-            })
+          cachedChunked<ChainEvent>(
+            `history-withdrawals.${mezo.earnVault}.${account}`,
+            from,
+            latest,
+            async (fromBlock, toBlock) =>
+              (
+                await client!.getLogs({
+                  address: mezo.earnVault,
+                  event: getAbiItem({ abi: earnVaultAbi, name: 'Withdraw' }),
+                  args: { owner: account },
+                  fromBlock,
+                  toBlock,
+                })
+              ).map((log) => ({
+                hash: log.transactionHash,
+                product: 'Earn' as const,
+                title: 'Withdrew',
+                detail: `${fmtAmount(log.args.musdOut, 2)} MUSD + ${fmtAmount(
+                  log.args.btcOut,
+                  6
+                )} BTC`,
+                block: log.blockNumber,
+              }))
           ),
         ]);
-        return [
-          ...deposits.map((log) => ({
-            hash: log.transactionHash,
-            product: 'Earn' as const,
-            title: 'Deposited',
-            detail: `${fmtAmount(log.args.assets, 2)} MUSD → ${fmtAmount(
-              log.args.shares,
-              4
-            )} mvMUSD`,
-            block: log.blockNumber,
-          })),
-          ...withdrawals.map((log) => ({
-            hash: log.transactionHash,
-            product: 'Earn' as const,
-            title: 'Withdrew',
-            detail: `${fmtAmount(log.args.musdOut, 2)} MUSD + ${fmtAmount(log.args.btcOut, 6)} BTC`,
-            block: log.blockNumber,
-          })),
-        ];
+        return [...deposits, ...withdrawals];
       };
 
       const troveEvents = async (): Promise<ChainEvent[]> => {
-        const from = latest > TROVE_LOOKBACK ? latest - TROVE_LOOKBACK : 0n;
-        const logs = await chunked(from, latest, (fromBlock, toBlock) =>
-          client!.getLogs({
-            address: mezo.borrowerOperations,
-            event: getAbiItem({ abi: borrowerOperationsAbi, name: 'TroveUpdated' }),
-            args: { _borrower: account },
-            fromBlock,
-            toBlock,
-          })
+        return cachedChunked<ChainEvent>(
+          `history-trove.${mezo.borrowerOperations}.${account}`,
+          TROVE_HISTORY_START,
+          latest,
+          async (fromBlock, toBlock) =>
+            (
+              await client!.getLogs({
+                address: mezo.borrowerOperations,
+                event: getAbiItem({ abi: borrowerOperationsAbi, name: 'TroveUpdated' }),
+                args: { _borrower: account },
+                fromBlock,
+                toBlock,
+              })
+            ).map((log) => {
+              const debt = (log.args._principal ?? 0n) + (log.args._interest ?? 0n);
+              return {
+                hash: log.transactionHash,
+                product: 'Borrow' as const,
+                title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated loan',
+                detail:
+                  log.args._operation === 1
+                    ? 'Debt repaid, BTC returned'
+                    : `${fmtAmount(log.args._coll, 4)} BTC · ${fmtAmount(debt, 2)} MUSD debt`,
+                block: log.blockNumber,
+              };
+            })
         );
-        return logs.map((log) => {
-          const debt = (log.args._principal ?? 0n) + (log.args._interest ?? 0n);
-          return {
-            hash: log.transactionHash,
-            product: 'Borrow' as const,
-            title: TROVE_OPS[log.args._operation ?? 2] ?? 'Updated loan',
-            detail:
-              log.args._operation === 1
-                ? 'Debt repaid, BTC returned'
-                : `${fmtAmount(log.args._coll, 4)} BTC · ${fmtAmount(debt, 2)} MUSD debt`,
-            block: log.blockNumber,
-          };
-        });
       };
 
       return kind === 'vault' ? vaultEvents() : troveEvents();

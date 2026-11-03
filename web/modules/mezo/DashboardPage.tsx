@@ -18,7 +18,7 @@ import {
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 
-import { CCR, MCR, mezo } from './config';
+import { mezo, ratioColor } from './config';
 import { btcValue, fmtAmount, fmtToken, fmtRatio, fmtUsd, liquidationPrice } from './format';
 import { TroveStatus, useMusdSystem, useUserPosition, useVaultDeposited } from './hooks';
 import { INFO } from './info';
@@ -287,13 +287,6 @@ export function DashboardPage() {
       </PageContainer>
     </>
   );
-}
-
-function ratioColor(ratio?: bigint) {
-  if (ratio === undefined) return 'text.primary';
-  if (ratio < MCR) return 'error.main';
-  if (ratio < CCR) return 'warning.main';
-  return 'success.main';
 }
 
 function Name({ icon, title, sub }: { icon: 'MUSD' | 'mvMUSD'; title: string; sub: string }) {

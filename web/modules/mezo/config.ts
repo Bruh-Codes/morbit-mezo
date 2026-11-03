@@ -45,3 +45,14 @@ export const explorerAddress = (address: string) => `${mezo.explorerUrl}/address
 export const MCR = 1_100_000_000_000_000_000n; // 110%
 export const CCR = 1_500_000_000_000_000_000n; // 150%
 export const MUSD_GAS_COMPENSATION = 200_000_000_000_000_000_000n; // 200 MUSD
+
+// Below this ratio a small BTC drop, or recovery mode at 150%, can liquidate a loan.
+export const AT_RISK = 1_600_000_000_000_000_000n; // 160%
+
+/** Theme color for a collateral ratio: red under 110%, amber under 160%, green above. */
+export function ratioColor(ratio?: bigint) {
+  if (ratio === undefined) return 'text.primary';
+  if (ratio < MCR) return 'error.main';
+  if (ratio < AT_RISK) return 'warning.main';
+  return 'success.main';
+}
