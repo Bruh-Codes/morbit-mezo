@@ -110,6 +110,7 @@ These transactions prove the full flow works on chain:
 | Wave 2: seed 1 MUSD of dead shares | [`0x9078424f…aaed`](https://explorer.test.mezo.org/tx/0x9078424f1a5faa7ce5b9d7164c730bcad0deace3d1cef14e5a13075c8155aaed) |
 | Wave 2: stream 100 MEZO to Auto Earn over 14 days | [`0x24faf361…2813`](https://explorer.test.mezo.org/tx/0x24faf361233475aaa361e2bc3e17172656d02a6d402198c532bfa21140e82813) |
 | Wave 2: deposit 100 MUSD into Auto Earn | [`0x6907fc0c…580d`](https://explorer.test.mezo.org/tx/0x6907fc0c76dc5a1fe2ed528e0506cf15be0d00e21461ce634a2c16d615ad580d) |
+| Wave 2: liquidate 5 loans under 110%, which unblocked Stability Pool withdrawals and paid Auto Earn its first BTC | [`0x52f169f8…9dcd`](https://explorer.test.mezo.org/tx/0x52f169f8ffe057973490c37eb76d0b10d913f433b8e72ea23f8edc8b51479dcd) |
 
 ## Run it locally
 
