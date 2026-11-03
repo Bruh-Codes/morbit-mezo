@@ -45,6 +45,23 @@ async function main() {
   const receipt = await vault.deploymentTransaction()?.wait();
   console.log(`MorbitEarnVaultV2 ${vaultAddress}  ${link(receipt.hash)}`);
 
+  // Seed 1 MUSD of shares to a dead address so the share price can never be inflated from an
+  // empty vault (first-depositor attack). Needs 1 MUSD in the deployer wallet.
+  const musd = new ethers.Contract(
+    mezoTestnet.musd,
+    ["function approve(address,uint256) returns (bool)", "function balanceOf(address) view returns (uint256)"],
+    deployer,
+  );
+  const seed = ethers.parseEther("1");
+  if ((await musd.balanceOf(deployer.address)) >= seed) {
+    await (await musd.approve(vaultAddress, seed)).wait();
+    const tx = await vault.deposit(seed, "0x000000000000000000000000000000000000dEaD");
+    await tx.wait();
+    console.log(`Seeded 1 MUSD of dead shares  ${link(tx.hash)}`);
+  } else {
+    console.warn("Deployer has no MUSD: skipped seeding dead shares. Deposit 1 MUSD to 0x…dEaD before launch.");
+  }
+
   const loopFactory = await ethers.deployContract("MorbitLoopFactory", [
     {
       borrowerOperations: deployment.borrowerOperations,
