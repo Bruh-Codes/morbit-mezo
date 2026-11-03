@@ -3,9 +3,10 @@ import hardhatIgnition from "@nomicfoundation/hardhat-ignition";
 import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
 import hardhatEthers from "@nomicfoundation/hardhat-ethers";
 import hardhatKeystore from "@nomicfoundation/hardhat-keystore";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 export default defineConfig({
-  plugins: [hardhatKeystore, hardhatEthers, hardhatIgnition, hardhatIgnitionEthers],
+  plugins: [hardhatKeystore, hardhatEthers, hardhatIgnition, hardhatIgnitionEthers, hardhatVerify],
   solidity: {
     version: "0.8.28",
     // Optional local solc binary for machines that cannot download compilers.
@@ -18,6 +19,26 @@ export default defineConfig({
       "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
       "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
     ],
+  },
+  // Source verification on the Mezo testnet explorer (Blockscout; no API key needed):
+  //   npx hardhat verify --network mezoTestnet --build-profile production <address> <constructor args...>
+  // scripts/deploy-earn-v3.js verifies everything it deploys.
+  chainDescriptors: {
+    31611: {
+      name: "Mezo Testnet",
+      blockExplorers: {
+        blockscout: {
+          name: "Mezo Explorer",
+          url: "https://explorer.test.mezo.org",
+          apiUrl: "https://api.explorer.test.mezo.org/api",
+        },
+      },
+    },
+  },
+  verify: {
+    blockscout: { enabled: true },
+    etherscan: { enabled: false },
+    sourcify: { enabled: false },
   },
   networks: {
     development: {
