@@ -111,9 +111,12 @@ Every number in the app comes live from Mezo testnet. There is no mock data. Eac
 
 | Contract | Address |
 |---|---|
-| **Auto Earn** (MorbitEarnVaultV2) | [`0x23d80c8c231D7BF671AC54cd5854728535063254`](https://explorer.test.mezo.org/address/0x23d80c8c231D7BF671AC54cd5854728535063254) |
-| **MorbitLoopFactory** | [`0x1793939e946eaC24Db782c59AC848ec8112f333d`](https://explorer.test.mezo.org/address/0x1793939e946eaC24Db782c59AC848ec8112f333d) |
-| **MezoPoolsSwapper** | [`0x219cCC99aB55c001f9c48cEC3740d6a64518bD72`](https://explorer.test.mezo.org/address/0x219cCC99aB55c001f9c48cEC3740d6a64518bD72) |
+| **Auto Earn** (MorbitEarnVaultV2, verified) | [`0xA8BAc7913D5163E2dF9aE3aF5B0AEeA44529Ac70`](https://explorer.test.mezo.org/address/0xA8BAc7913D5163E2dF9aE3aF5B0AEeA44529Ac70?tab=contract) |
+| **MorbitLoopFactory** (loop + Borrow & Earn, verified) | [`0x6e43AEce3302f16adAa6A19c7eFb8521f8c55A4b`](https://explorer.test.mezo.org/address/0x6e43AEce3302f16adAa6A19c7eFb8521f8c55A4b?tab=contract) |
+| **maMUSD/MUSD stable pool** (Mezo Pools) | [`0xBF329A2A130cb0D5B5218f1672E51Fb36089FDE0`](https://explorer.test.mezo.org/address/0xBF329A2A130cb0D5B5218f1672E51Fb36089FDE0) |
+| **MezoPoolsSwapper** (verified) | [`0x219cCC99aB55c001f9c48cEC3740d6a64518bD72`](https://explorer.test.mezo.org/address/0x219cCC99aB55c001f9c48cEC3740d6a64518bD72?tab=contract) |
+| Previous Auto Earn (withdrawals only) | [`0x23d80c8c231D7BF671AC54cd5854728535063254`](https://explorer.test.mezo.org/address/0x23d80c8c231D7BF671AC54cd5854728535063254) |
+| Previous Loop factory (unused) | [`0x1793939e946eaC24Db782c59AC848ec8112f333d`](https://explorer.test.mezo.org/address/0x1793939e946eaC24Db782c59AC848ec8112f333d) |
 | **Simple Earn** (MorbitEarnVault) | [`0x8D6444887c22Eb1A32De4299E507C62EbAb4004A`](https://explorer.test.mezo.org/address/0x8D6444887c22Eb1A32De4299E507C62EbAb4004A) |
 | MUSD | [`0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503`](https://explorer.test.mezo.org/address/0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503) |
 | BorrowerOperations | [`0xCdF7028ceAB81fA0C6971208e83fa7872994beE5`](https://explorer.test.mezo.org/address/0xCdF7028ceAB81fA0C6971208e83fa7872994beE5) |
@@ -134,6 +137,11 @@ These transactions prove the full flow works on chain:
 | Wave 2: seed 1 MUSD of dead shares | [`0x9078424f…aaed`](https://explorer.test.mezo.org/tx/0x9078424f1a5faa7ce5b9d7164c730bcad0deace3d1cef14e5a13075c8155aaed) |
 | Wave 2: stream 100 MEZO to Auto Earn over 14 days | [`0x24faf361…2813`](https://explorer.test.mezo.org/tx/0x24faf361233475aaa361e2bc3e17172656d02a6d402198c532bfa21140e82813) |
 | Wave 2: deposit 100 MUSD into Auto Earn | [`0x6907fc0c…580d`](https://explorer.test.mezo.org/tx/0x6907fc0c76dc5a1fe2ed528e0506cf15be0d00e21461ce634a2c16d615ad580d) |
+| Judge feedback: deploy the new Auto Earn vault | [`0x6ac197b0…63f6`](https://explorer.test.mezo.org/tx/0x6ac197b0ac6c9eae9d50d051aa604caea7f4695c0eca19d5fa15ad1b184963f6) |
+| Judge feedback: seed 1 MUSD of dead shares | [`0x4c10aa1b…4e89`](https://explorer.test.mezo.org/tx/0x4c10aa1bab7decaec886335a0cebe354e7f345d827e7153e1781b64e43fe4e89) |
+| Judge feedback: deploy the Loop factory with Borrow & Earn | [`0xe41d4e89…c489`](https://explorer.test.mezo.org/tx/0xe41d4e8909146ca6099158eeae2d2ee846c590e95630263e6b932cf78ff9c489) |
+| Judge feedback: create the maMUSD/MUSD pool on Mezo Pools | [`0xe36de931…545f`](https://explorer.test.mezo.org/tx/0xe36de93142417a6f058209f8d40fab631858d4b2dc90f717767e4442fda1545f) |
+| Judge feedback: add 10 maMUSD + 10 MUSD of liquidity | [`0xac213052…63bd`](https://explorer.test.mezo.org/tx/0xac213052e8cef97a6e336a0586fb6fab858b4a7eb8298209040746e1882063bd) |
 | Wave 2: liquidate 5 loans under 110%, which unblocked Stability Pool withdrawals and paid Auto Earn its first BTC | [`0x52f169f8…9dcd`](https://explorer.test.mezo.org/tx/0x52f169f8ffe057973490c37eb76d0b10d913f433b8e72ea23f8edc8b51479dcd) |
 
 ## Run it locally
