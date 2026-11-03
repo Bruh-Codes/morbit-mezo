@@ -23,6 +23,14 @@ async function main() {
   const link = (hash) => `${mezoTestnet.explorerUrl}/tx/${hash}`;
   console.log(`Deployer ${deployer.address}: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} BTC`);
 
+  // Check the MEZO balance before deploying anything, so a short balance doesn't leave a half deploy.
+  if (process.env.REWARD_MEZO) {
+    const mezo = new ethers.Contract(mezoTestnet.mezo, ["function balanceOf(address) view returns (uint256)"], deployer);
+    const balance = await mezo.balanceOf(deployer.address);
+    if (balance < ethers.parseEther(process.env.REWARD_MEZO))
+      throw new Error(`Deployer holds ${ethers.formatEther(balance)} MEZO, needs ${process.env.REWARD_MEZO}`);
+  }
+
   const swapper = await ethers.deployContract("MezoPoolsSwapper", [
     mezoTestnet.mezoRouter,
     mezoTestnet.btc,
