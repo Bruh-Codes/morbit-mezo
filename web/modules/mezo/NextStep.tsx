@@ -47,11 +47,13 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
 
 /** One clear next action for the connected wallet. */
 export function NextStep({ position }: { position: ReturnType<typeof useUserPosition> }) {
-  const { isConnected, chainId } = useAccount();
+  // `address` rather than `isConnected`: wagmi keeps isConnected false while it reconnects a
+  // remembered wallet, which showed "Connect a wallet" to people who were connected.
+  const { address, chainId } = useAccount();
   const { switchChain, isPending } = useSwitchChain();
 
   let content: { title: string; button: React.ReactNode } | undefined;
-  if (!isConnected) {
+  if (!address) {
     content = {
       title: 'Connect a wallet to get started',
       button: (

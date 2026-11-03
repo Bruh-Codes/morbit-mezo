@@ -204,15 +204,21 @@ function OpenLoop({ system, loop }: { system: System; loop: Loop }) {
       ? position.btcBalance - GAS_RESERVE
       : 0n;
 
+  // Smallest deposit whose borrowed MUSD meets MUSD's minimum loan at this leverage (+1% for price moves).
+  const minColl =
+    system.minNetDebt !== undefined && loop.buyPrice
+      ? (system.minNetDebt * WAD * 101n) / ((lev - 100n) * loop.buyPrice)
+      : undefined;
+
   const error = (() => {
     if (!coll) return undefined;
     if (position.btcBalance !== undefined && coll > position.btcBalance)
       return 'Not enough BTC in your wallet.';
     if (system.minNetDebt !== undefined && debt < system.minNetDebt)
-      return `The smallest loan is ${fmtAmount(
+      return `Deposit at least ${fmtAmount(minColl, 4)} BTC at ${leverage}x, or raise the leverage. MUSD loans start at ${fmtAmount(
         system.minNetDebt,
         0
-      )} MUSD. Add BTC or raise the leverage.`;
+      )} MUSD.`;
     if (ratio !== undefined && ratio < MCR) return 'This loop would start below 110%.';
     return undefined;
   })();
@@ -262,6 +268,11 @@ function OpenLoop({ system, loop }: { system: System; loop: Loop }) {
               </Button>
             ))}
           </Stack>
+          {minColl !== undefined && (
+            <Typography variant="description" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Minimum deposit at {leverage}x: {fmtAmount(minColl, 4)} BTC
+            </Typography>
+          )}
         </Box>
         <Box>
           <Row label="Borrow and swap" value={fmtToken('MUSD', debt, 2)} />

@@ -1,10 +1,11 @@
 'use client';
 
 import { ExpandMore } from '@mui/icons-material';
-import { Box, Collapse, Grid, Stack, Typography } from '@mui/material';
+import { Box, Collapse, Grid, Link, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
 import { Address } from './Address';
+import { BOT } from './AlertsButton';
 import { mezo } from './config';
 
 const CONTRACTS: [string, string | undefined][] = [
@@ -27,9 +28,20 @@ export function Footer() {
       sx={{ mt: 'auto', borderTop: 1, borderColor: 'divider', px: { xs: 2, md: 5, xl: 8 }, py: 2 }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
-        <Typography variant="description" color="text.secondary">
-          Morbit · Mezo testnet
-        </Typography>
+        <Stack direction="row" alignItems="center" gap={2}>
+          <Typography variant="description" color="text.secondary">
+            Morbit · Mezo testnet
+          </Typography>
+          <Link
+            href={`https://t.me/${BOT}`}
+            target="_blank"
+            rel="noopener"
+            variant="description"
+            color="text.secondary"
+          >
+            Telegram alerts
+          </Link>
+        </Stack>
         <Stack
           direction="row"
           alignItems="center"
