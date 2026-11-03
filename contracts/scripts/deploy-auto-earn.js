@@ -1,5 +1,6 @@
-// Deploys Auto Earn (MorbitEarnVaultV2) and its Mezo Pools swapper on Mezo testnet, and
-// records them in web/ui-config/mezoDeployment.json next to the Simple Earn vault.
+// Deploys the Wave 2 contracts on Mezo testnet: the Mezo Pools swapper, Auto Earn
+// (MorbitEarnVaultV2) and the BTC Loop factory, and records them in
+// web/ui-config/mezoDeployment.json next to the Simple Earn vault.
 //
 //   npx hardhat run scripts/deploy-auto-earn.js --network mezoTestnet
 //
@@ -44,6 +45,19 @@ async function main() {
   const receipt = await vault.deploymentTransaction()?.wait();
   console.log(`MorbitEarnVaultV2 ${vaultAddress}  ${link(receipt.hash)}`);
 
+  const loopFactory = await ethers.deployContract("MorbitLoopFactory", [
+    {
+      borrowerOperations: deployment.borrowerOperations,
+      troveManager: mezoTestnet.troveManager,
+      priceFeed: mezoTestnet.priceFeed,
+      swapper: await swapper.getAddress(),
+      musd: mezoTestnet.musd,
+    },
+  ]);
+  await loopFactory.waitForDeployment();
+  const loopReceipt = await loopFactory.deploymentTransaction()?.wait();
+  console.log(`MorbitLoopFactory ${await loopFactory.getAddress()}  ${link(loopReceipt.hash)}`);
+
   const rewardMezo = process.env.REWARD_MEZO;
   if (rewardMezo) {
     const amount = ethers.parseEther(rewardMezo);
@@ -68,6 +82,8 @@ async function main() {
     btcSwapper: await swapper.getAddress(),
     autoEarnVault: vaultAddress,
     autoEarnVaultDeployBlock: receipt.blockNumber,
+    loopFactory: await loopFactory.getAddress(),
+    loopFactoryDeployBlock: loopReceipt.blockNumber,
     autoEarnDeployedAt: new Date().toISOString(),
   };
   fs.writeFileSync(outFile, JSON.stringify(out, null, 2) + "\n");
