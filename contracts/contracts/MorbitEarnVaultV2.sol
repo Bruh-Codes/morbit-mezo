@@ -25,6 +25,8 @@ interface IBtcToMusdSwapper {
  *            set period (Synthetix StakingRewards accounting). Shares stay transferable; rewards
  *            are settled on every balance change.
  *
+ *         3. A performance fee (default 10%, at most 20%) on harvested yield only.
+ *
  *         Withdrawals always stay open, also while deposits are paused.
  */
 contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
@@ -33,6 +35,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
     uint256 private constant WAD = 1e18;
     uint256 private constant BPS = 10_000;
     uint256 public constant MAX_SLIPPAGE_BPS = 1_000; // 10%
+    uint256 public constant MAX_PERFORMANCE_FEE_BPS = 2_000; // 20%
 
     IERC20 public immutable musd;
     IERC20 public immutable rewardToken; // MEZO
@@ -47,6 +50,11 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
     uint256 public depositCap;
     bool public depositsPaused;
 
+    /// @notice Share of harvested yield (MUSD from compounding) sent to `feeRecipient`. Deposits and
+    ///         withdrawals are free; the fee only applies to gains.
+    uint256 public performanceFeeBps = 1_000; // 10%
+    address public feeRecipient;
+
     // --- MEZO reward stream ---
     uint256 public rewardRate; // MEZO per second, 18 decimals
     uint256 public periodFinish;
@@ -59,6 +67,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
     uint256 public totalHarvestedBtc;
     uint256 public totalCompoundedMusd;
     uint256 public lastHarvestAt;
+    uint256 public totalFeesMusd;
 
     event Deposit(address indexed caller, address indexed receiver, uint256 assets, uint256 shares);
     event Withdraw(
@@ -70,6 +79,8 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
         uint256 btcOut
     );
     event Harvest(address indexed caller, uint256 btcIn, uint256 musdOut);
+    event PerformanceFeePaid(address indexed recipient, uint256 musd);
+    event PerformanceFeeUpdated(uint256 feeBps, address recipient);
     event RewardAdded(uint256 amount, uint256 duration);
     event RewardPaid(address indexed account, uint256 amount);
     event SwapperUpdated(address swapper);
@@ -88,6 +99,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
     error InsufficientOutput(uint256 received, uint256 required);
     error RewardTooHigh();
     error InvalidDuration();
+    error FeeTooHigh();
 
     constructor(
         address musd_,
@@ -102,6 +114,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
         stabilityPool = IMusdStabilityPool(stabilityPool_);
         priceFeed = IMusdPriceFeed(priceFeed_);
         swapper = IBtcToMusdSwapper(swapper_);
+        feeRecipient = owner_;
         IERC20(musd_).forceApprove(stabilityPool_, type(uint256).max);
     }
 
@@ -201,9 +214,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
         _burn(owner_, shares);
 
         uint256 idle = musd.balanceOf(address(this));
-        if (stabilityPool.getCompoundedMUSDDeposit(address(this)) > 0) {
-            stabilityPool.withdrawFromSP(musdOut > idle ? musdOut - idle : 0);
-        }
+        _withdrawFromPool(musdOut > idle ? musdOut - idle : 0);
 
         uint256 musdBalance = musd.balanceOf(address(this));
         if (musdOut > musdBalance) musdOut = musdBalance;
@@ -238,7 +249,7 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
 
         // A zero withdrawal pays out pending BTC gains without touching the MUSD deposit,
         // and works even while undercollateralized troves block real withdrawals.
-        if (stabilityPool.getCompoundedMUSDDeposit(address(this)) > 0) stabilityPool.withdrawFromSP(0);
+        _withdrawFromPool(0);
 
         uint256 btcIn = address(this).balance;
         if (btcIn < minHarvestBtc || btcIn == 0) revert NothingToHarvest();
@@ -248,10 +259,19 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
 
         uint256 before = musd.balanceOf(address(this));
         swapper.swapBtcToMusd{value: btcIn}(required, address(this));
-        musdOut = musd.balanceOf(address(this)) - before;
-        if (musdOut < required) revert InsufficientOutput(musdOut, required);
+        uint256 swapped = musd.balanceOf(address(this)) - before;
+        if (swapped < required) revert InsufficientOutput(swapped, required);
 
-        stabilityPool.provideToSP(musd.balanceOf(address(this)));
+        uint256 fee = feeRecipient == address(0) ? 0 : (swapped * performanceFeeBps) / BPS;
+        if (fee > 0) {
+            musd.safeTransfer(feeRecipient, fee);
+            totalFeesMusd += fee;
+            emit PerformanceFeePaid(feeRecipient, fee);
+        }
+        musdOut = swapped - fee;
+
+        uint256 toDeposit = musd.balanceOf(address(this));
+        if (toDeposit > 0) stabilityPool.provideToSP(toDeposit);
 
         totalHarvestedBtc += btcIn;
         totalCompoundedMusd += musdOut;
@@ -296,6 +316,14 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
         emit HarvestSettingsUpdated(maxSlippageBps_, minHarvestBtc_);
     }
 
+    /// @notice Set the performance fee on harvested yield (at most 20%) and who receives it.
+    function setPerformanceFee(uint256 feeBps, address recipient) external onlyOwner {
+        if (feeBps > MAX_PERFORMANCE_FEE_BPS) revert FeeTooHigh();
+        performanceFeeBps = feeBps;
+        feeRecipient = recipient;
+        emit PerformanceFeeUpdated(feeBps, recipient);
+    }
+
     function setDepositCap(uint256 cap) external onlyOwner {
         depositCap = cap;
         emit DepositCapUpdated(cap);
@@ -307,6 +335,19 @@ contract MorbitEarnVaultV2 is ERC20, Ownable, ReentrancyGuard {
     }
 
     // --- Internal ---
+
+    /**
+     * @dev Withdraw `amount` MUSD from the Stability Pool and collect the BTC gain. When a
+     *      liquidation has used up the whole deposit, the compounded deposit is zero but the BTC
+     *      gain is still owed, so a zero withdrawal is still made to collect it.
+     */
+    function _withdrawFromPool(uint256 amount) internal {
+        if (stabilityPool.getCompoundedMUSDDeposit(address(this)) > 0) {
+            stabilityPool.withdrawFromSP(amount);
+        } else if (stabilityPool.getDepositorCollateralGain(address(this)) > 0) {
+            stabilityPool.withdrawFromSP(0);
+        }
+    }
 
     function _updateReward(address account) internal {
         rewardPerShareStored = rewardPerShare();

@@ -29,9 +29,11 @@ function pickStep(position: ReturnType<typeof useUserPosition>): Step | undefine
       cta: 'Add BTC',
       href: '/borrow/?action=addColl',
     };
-  if (position.legacy)
+  if (position.legacy.some((v) => v.shares > 0n))
     return {
-      title: `Move your Simple Earn deposit to ${EARN.name}`,
+      title: `Move your ${position.legacy.find((v) => v.shares > 0n)!.name} deposit to the new ${
+        EARN.name
+      }`,
       cta: 'Move',
       href: '/earn/',
     };

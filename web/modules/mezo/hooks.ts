@@ -23,7 +23,7 @@ import {
   stabilityPoolAbi,
   troveManagerAbi,
 } from './abis';
-import { mezo, MEZO_TESTNET_ID, ZERO } from './config';
+import { type LegacyVault, mezo, MEZO_TESTNET_ID, ZERO } from './config';
 import { cachedChunked } from './logs';
 import { recordTx, updateTx } from './txHistory';
 
@@ -64,6 +64,8 @@ export type AutoEarnStats = {
   mezoPrice?: bigint;
   /** Yearly MEZO rewards ÷ vault value, 1e18 = 100%. Undefined when no stream is running. */
   rewardApr?: bigint;
+  /** Share of compounded BTC gains kept as Morbit's fee, in basis points. Undefined on vaults without one. */
+  performanceFeeBps?: bigint;
 };
 
 export type MusdSystem = {
@@ -160,6 +162,7 @@ export function useMusdSystem(): MusdSystem {
           'minHarvestBtc',
           'totalCompoundedMusd',
           'lastHarvestAt',
+          'performanceFeeBps',
         ] as const
       ).map((functionName) => ({
         address: vault ?? ZERO,
@@ -234,7 +237,7 @@ type Results = readonly { status: 'success' | 'failure'; result?: unknown }[] | 
 function autoEarnStats(data: Results, totalAssets?: bigint): AutoEarnStats {
   const rewardRate = ok<bigint>(data?.[0]);
   const periodFinish = ok<bigint>(data?.[1]);
-  const mezoPrice = ok<readonly bigint[]>(data?.[5])?.[1];
+  const mezoPrice = ok<readonly bigint[]>(data?.[6])?.[1];
   const live = periodFinish !== undefined && periodFinish > BigInt(Math.floor(Date.now() / 1000));
   return {
     rewardRate,
@@ -242,6 +245,7 @@ function autoEarnStats(data: Results, totalAssets?: bigint): AutoEarnStats {
     minHarvestBtc: ok(data?.[2]),
     totalCompoundedMusd: ok(data?.[3]),
     lastHarvestAt: ok(data?.[4]),
+    performanceFeeBps: ok(data?.[5]),
     mezoPrice,
     rewardApr:
       live && rewardRate && mezoPrice !== undefined && totalAssets
@@ -278,8 +282,8 @@ export type UserPosition = {
     /** Auto Earn: MEZO ready to claim. */
     mezoEarned?: bigint;
   };
-  /** Shares still in Simple Earn after Auto Earn launched. */
-  legacy?: { shares: bigint; value?: bigint };
+  /** Positions still in earlier Earn vaults (Simple Earn, the previous Auto Earn). */
+  legacy: (LegacyVault & { shares: bigint; value?: bigint; mezoEarned?: bigint })[];
   isLoading: boolean;
   refetch: () => void;
 };
@@ -336,19 +340,52 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
         chainId,
       },
       { address: vault, abi: earnVaultAbi, functionName: 'balanceOf', args: [user], chainId },
-      {
-        address: mezo.legacyVault ?? ZERO,
-        abi: earnVaultAbi,
-        functionName: 'balanceOf',
-        args: [user],
-        chainId,
-      },
       // Fails harmlessly on Simple Earn, which has no rewards.
       { address: vault, abi: autoEarnVaultAbi, functionName: 'earned', args: [user], chainId },
     ],
     query: { enabled: !!address, refetchInterval: REFRESH_MS, placeholderData: keepPreviousData },
   });
-  const legacyShares = mezo.legacyVault ? ok<bigint>(data?.[8]) : undefined;
+  const legacyQuery = {
+    enabled: !!address && mezo.legacyVaults.length > 0,
+    refetchInterval: REFRESH_MS,
+  };
+  const legacyBalances = useReadContracts({
+    allowFailure: true,
+    contracts: mezo.legacyVaults.map((v) => ({
+      address: v.address,
+      abi: earnVaultAbi,
+      functionName: 'balanceOf' as const,
+      args: [user] as const,
+      chainId,
+    })),
+    query: legacyQuery,
+  });
+  const legacyRewards = useReadContracts({
+    allowFailure: true,
+    contracts: mezo.legacyVaults.map((v) => ({
+      address: v.address,
+      abi: autoEarnVaultAbi,
+      functionName: 'earned' as const,
+      args: [user] as const,
+      chainId,
+    })),
+    query: legacyQuery,
+  });
+  const legacyShares = mezo.legacyVaults.map((_, i) => ok<bigint>(legacyBalances.data?.[i]) ?? 0n);
+  const legacyEarned = mezo.legacyVaults.map((v, i) =>
+    v.auto ? ok<bigint>(legacyRewards.data?.[i]) : undefined
+  );
+  const legacyValues = useReadContracts({
+    allowFailure: true,
+    contracts: mezo.legacyVaults.map((v, i) => ({
+      address: v.address,
+      abi: earnVaultAbi,
+      functionName: 'convertToAssets' as const,
+      args: [legacyShares[i]] as const,
+      chainId,
+    })),
+    query: { enabled: legacyShares.some((x) => x > 0n), refetchInterval: REFRESH_MS },
+  });
 
   const shares = mezo.earnVault ? ok<bigint>(data?.[7]) : undefined;
   const preview = useReadContracts({
@@ -368,16 +405,9 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
         args: [shares ?? 0n],
         chainId,
       },
-      {
-        address: mezo.legacyVault ?? ZERO,
-        abi: earnVaultAbi,
-        functionName: 'convertToAssets',
-        args: [legacyShares ?? 0n],
-        chainId,
-      },
     ],
     query: {
-      enabled: !!address && !!mezo.earnVault && (!!shares || !!legacyShares),
+      enabled: !!address && !!mezo.earnVault && !!shares,
       refetchInterval: REFRESH_MS,
       placeholderData: keepPreviousData,
     },
@@ -404,16 +434,24 @@ export function useUserPosition(btcPrice?: bigint): UserPosition {
       value: shares === 0n ? 0n : ok(preview.data?.[0]),
       musdOut: shares === 0n ? 0n : redeem?.[0],
       btcOut: shares === 0n ? 0n : redeem?.[1],
-      mezoEarned: mezo.autoEarn ? ok<bigint>(data?.[9]) : undefined,
+      mezoEarned: mezo.autoEarn ? ok<bigint>(data?.[8]) : undefined,
     },
-    legacy: legacyShares
-      ? { shares: legacyShares, value: ok<bigint>(preview.data?.[2]) }
-      : undefined,
+    legacy: mezo.legacyVaults
+      .map((v, i) => ({
+        ...v,
+        shares: legacyShares[i],
+        value: legacyShares[i] === 0n ? 0n : ok<bigint>(legacyValues.data?.[i]),
+        mezoEarned: legacyEarned[i],
+      }))
+      .filter((v) => v.shares > 0n || (v.mezoEarned ?? 0n) > 0n),
     isLoading: isLoading || btc.isLoading,
     refetch: () => {
       btc.refetch();
       refetch();
       preview.refetch();
+      legacyBalances.refetch();
+      legacyRewards.refetch();
+      legacyValues.refetch();
     },
   };
 }

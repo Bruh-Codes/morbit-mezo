@@ -16,7 +16,9 @@ const WARN = DEFAULT_WARN.toString();
 
 /** Secret Telegram echoes on every webhook call, derived from the token so there is one less env var. */
 export function webhookSecret() {
-  return TOKEN ? createHash('sha256').update(`morbit-webhook:${TOKEN}`).digest('hex').slice(0, 48) : undefined;
+  return TOKEN
+    ? createHash('sha256').update(`morbit-webhook:${TOKEN}`).digest('hex').slice(0, 48)
+    : undefined;
 }
 
 /** Checks `Authorization: Bearer <CRON_SECRET>` or `?key=<CRON_SECRET>`. */
@@ -24,7 +26,10 @@ export function authorized(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   const url = new URL(request.url);
-  return request.headers.get('authorization') === `Bearer ${secret}` || url.searchParams.get('key') === secret;
+  return (
+    request.headers.get('authorization') === `Bearer ${secret}` ||
+    url.searchParams.get('key') === secret
+  );
 }
 
 export async function tg<T = unknown>(method: string, body: Record<string, unknown>): Promise<T> {
@@ -41,9 +46,12 @@ export async function tg<T = unknown>(method: string, body: Record<string, unkno
 }
 
 const send = (chatId: number | string, text: string) =>
-  tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }).catch((e) =>
-    console.error(e),
-  );
+  tg('sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  }).catch((e) => console.error(e));
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 // --- Commands ---
@@ -66,7 +74,7 @@ export async function handleUpdate(update: { message?: { chat: { id: number }; t
         '/unwatch <i>address</i>: stop',
         '/status: current ratios',
         '/threshold <i>percent</i>: warn below this ratio (default 160)',
-      ].join('\n'),
+      ].join('\n')
     );
   }
   if (command === '/watch') {
@@ -79,12 +87,15 @@ export async function handleUpdate(update: { message?: { chat: { id: number }; t
     await saveChat(id, chat);
     return send(
       id,
-      chat.addresses.length ? `Still watching ${chat.addresses.map(short).join(', ')}.` : 'Not watching any wallet.',
+      chat.addresses.length
+        ? `Still watching ${chat.addresses.map(short).join(', ')}.`
+        : 'Not watching any wallet.'
     );
   }
   if (command === '/threshold') {
     const n = Number(arg);
-    if (!(n >= 120 && n <= 400)) return send(id, 'Pick a number between 120 and 400, e.g. /threshold 170.');
+    if (!(n >= 120 && n <= 400))
+      return send(id, 'Pick a number between 120 and 400, e.g. /threshold 170.');
     const chat = await getChat(id, WARN);
     chat.warnAt = ((BigInt(Math.round(n * 10)) * WAD) / 1000n).toString();
     await saveChat(id, chat);
@@ -99,15 +110,23 @@ async function watch(id: number, address: string) {
   const a = getAddress(address);
   if (!chat.addresses.includes(a)) chat.addresses.push(a);
   await saveChat(id, chat);
-  await send(id, `Watching ${short(a)}. I will message you when a position drops below ${pct(BigInt(chat.warnAt))}.`);
+  await send(
+    id,
+    `Watching ${short(a)}. I will message you when a position drops below ${pct(
+      BigInt(chat.warnAt)
+    )}.`
+  );
   return status(id);
 }
 
 async function status(id: number) {
   const chat = await getChat(id, WARN);
-  if (!chat.addresses.length) return send(id, 'Not watching any wallet yet. Send /watch <address>.');
+  if (!chat.addresses.length)
+    return send(id, 'Not watching any wallet yet. Send /watch <address>.');
   const { price, tcr, recoveryMode } = await systemState();
-  const lines = [`BTC ${usd(price)} · system ratio ${pct(tcr)}${recoveryMode ? ' (recovery mode)' : ''}`];
+  const lines = [
+    `BTC ${usd(price)} · system ratio ${pct(tcr)}${recoveryMode ? ' (recovery mode)' : ''}`,
+  ];
   for (const a of chat.addresses) {
     const list = await positions(a as Address);
     lines.push('', `<b>${short(a)}</b>`);
@@ -137,14 +156,20 @@ export async function checkAll() {
               next === 'critical'
                 ? '🚨 <b>Liquidation risk</b>'
                 : next === 'warn'
-                  ? '⚠️ <b>Getting close</b>'
-                  : '✅ <b>Back to safe</b>';
+                ? '⚠️ <b>Getting close</b>'
+                : '✅ <b>Back to safe</b>';
             const advice = next === 'ok' ? '' : '\nAdd BTC or repay to raise the ratio.';
             await send(
               id,
               `${head}\n${short(a)} ${describe(p, price)}\nBTC is ${usd(price)}.${
                 recoveryMode ? ' Mezo is in recovery mode: loans under 150% can be liquidated.' : ''
-              }${advice}\n<a href="${APP_URL}/${p.label === 'BTC loop' ? 'loop' : 'borrow'}/">Open Morbit</a>`,
+              }${advice}\n<a href="${APP_URL}/${
+                p.label === 'BTC loop'
+                  ? 'loop/'
+                  : p.label === 'Borrow & Earn'
+                  ? 'earn/?tab=borrow'
+                  : 'borrow/'
+              }">Open Morbit</a>`
             );
             sent++;
           }
@@ -158,5 +183,9 @@ export async function checkAll() {
     }
   }
   const keeper = await runKeeper().catch((e: Error) => [`keeper error: ${e.message}`]);
-  return { chats: ids.length, alertsSent: sent, keeper: keeper.map((l) => l.replace(/(0x[0-9a-f]{64})/, `${explorerUrl}/tx/$1`)) };
+  return {
+    chats: ids.length,
+    alertsSent: sent,
+    keeper: keeper.map((l) => l.replace(/(0x[0-9a-f]{64})/, `${explorerUrl}/tx/$1`)),
+  };
 }

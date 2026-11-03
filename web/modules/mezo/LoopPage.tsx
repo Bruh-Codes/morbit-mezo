@@ -6,6 +6,7 @@ import { type Address, maxUint256 } from 'viem';
 import { useAccount, useReadContracts } from 'wagmi';
 
 import { AlertsButton } from './AlertsButton';
+import { AccountMode, useMorbitAccount } from './BorrowEarn';
 import { erc20Abi, loopAccountAbi, loopFactoryAbi, mezoRouterAbi, troveManagerAbi } from './abis';
 import { MCR, mezo, MEZO_TESTNET_ID, MUSD_GAS_COMPENSATION, ratioColor, ZERO } from './config';
 import {
@@ -125,7 +126,10 @@ export function LoopPage() {
   const { address } = useAccount();
   const system = useMusdSystem();
   const loop = useLoop(address);
-  const active = loop.status === TroveStatus.active;
+  const morbit = useMorbitAccount(address);
+  // The same Morbit account runs Borrow & Earn; its trove is not a loop.
+  const earnOpen = morbit.active && morbit.mode === AccountMode.earn;
+  const active = loop.status === TroveStatus.active && !earnOpen;
 
   return (
     <>
@@ -156,6 +160,11 @@ export function LoopPage() {
           <Panel title="Loop is not deployed yet">{null}</Panel>
         ) : !address ? (
           <ConnectPrompt message="Connect a wallet to open a BTC loop." />
+        ) : earnOpen ? (
+          <Alert severity="info">
+            Your Morbit account is running Borrow &amp; Earn. Close it on the{' '}
+            <a href="/earn/?tab=borrow">Earn page</a> to open a loop.
+          </Alert>
         ) : (
           <Grid container spacing={3} alignItems="flex-start">
             <Grid item xs={12} md={7}>
@@ -215,7 +224,10 @@ function OpenLoop({ system, loop }: { system: System; loop: Loop }) {
     if (position.btcBalance !== undefined && coll > position.btcBalance)
       return 'Not enough BTC in your wallet.';
     if (system.minNetDebt !== undefined && debt < system.minNetDebt)
-      return `Deposit at least ${fmtAmount(minColl, 4)} BTC at ${leverage}x, or raise the leverage. MUSD loans start at ${fmtAmount(
+      return `Deposit at least ${fmtAmount(
+        minColl,
+        4
+      )} BTC at ${leverage}x, or raise the leverage. MUSD loans start at ${fmtAmount(
         system.minNetDebt,
         0
       )} MUSD.`;
@@ -269,7 +281,11 @@ function OpenLoop({ system, loop }: { system: System; loop: Loop }) {
             ))}
           </Stack>
           {minColl !== undefined && (
-            <Typography variant="description" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            <Typography
+              variant="description"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1 }}
+            >
               Minimum deposit at {leverage}x: {fmtAmount(minColl, 4)} BTC
             </Typography>
           )}

@@ -17,9 +17,13 @@
   "mezoRouter": "0x9a1ff7FE3a0F69959A3fBa1F1e5ee18e1A9CD7E9",
   "poolFactory": "0x4947243CC818b627A5D06d14C4eCe7398A23Ce1A",
   "btcSwapper": "0x219cCC99aB55c001f9c48cEC3740d6a64518bD72",
-  "autoEarnVault": "0x23d80c8c231D7BF671AC54cd5854728535063254",
-  "autoEarnVaultDeployBlock": 16542144,
-  "loopFactory": "0x1793939e946eaC24Db782c59AC848ec8112f333d",
-  "loopFactoryDeployBlock": 16542146,
-  "autoEarnDeployedAt": "2026-11-03T06:47:00.000Z"
+  "autoEarnVault": "0xA8BAc7913D5163E2dF9aE3aF5B0AEeA44529Ac70",
+  "autoEarnVaultDeployBlock": 16543421,
+  "loopFactory": "0x6e43AEce3302f16adAa6A19c7eFb8521f8c55A4b",
+  "loopFactoryDeployBlock": 16543427,
+  "autoEarnDeployedAt": "2026-11-03T08:17:34.602Z",
+  "legacyAutoEarnVault": "0x23d80c8c231D7BF671AC54cd5854728535063254",
+  "legacyAutoEarnVaultDeployBlock": 16542144,
+  "legacyLoopFactory": "0x1793939e946eaC24Db782c59AC848ec8112f333d",
+  "maMusdPool": "0xBF329A2A130cb0D5B5218f1672E51Fb36089FDE0"
 }

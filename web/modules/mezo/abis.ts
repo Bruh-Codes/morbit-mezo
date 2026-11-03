@@ -67,6 +67,8 @@ export const autoEarnVaultAbi = parseAbi([
   'function minHarvestBtc() view returns (uint256)',
   'function totalCompoundedMusd() view returns (uint256)',
   'function lastHarvestAt() view returns (uint256)',
+  'function performanceFeeBps() view returns (uint256)',
+  'function totalFeesMusd() view returns (uint256)',
   'event Harvest(address indexed caller, uint256 btcIn, uint256 musdOut)',
   'event RewardPaid(address indexed account, uint256 amount)',
 ]);
@@ -79,6 +81,7 @@ export const mezoRouterAbi = parseAbi([
 export const loopFactoryAbi = parseAbi([
   'function accountOf(address owner) view returns (address)',
   'function openLoop(uint256 debtAmount, uint256 minBtcOut, address[4] hints) payable returns (address)',
+  'function openEarn(uint256 debtAmount, address upperHint, address lowerHint) payable returns (address account, uint256 shares)',
 ]);
 
 export const loopAccountAbi = parseAbi([
@@ -86,6 +89,11 @@ export const loopAccountAbi = parseAbi([
   'function addCollateral(address upperHint, address lowerHint) payable',
   'function closeLoop(uint256 btcToSell, uint256 minMusdOut, address upperHint, address lowerHint)',
   'function sweep() returns (uint256 btcOut, uint256 musdOut)',
+  'function closeEarn(uint256 shares)',
+  /** 0 none, 1 BTC loop, 2 Borrow & Earn. Accounts from the first Loop factory do not have it. */
+  'function mode() view returns (uint8)',
+  'event EarnOpened(uint256 collateralIn, uint256 debt, uint256 shares)',
+  'event EarnClosed(uint256 sharesRedeemed, uint256 btcOut, uint256 musdOut)',
   'event LoopOpened(uint256 collateralIn, uint256 debt, uint256 btcBought)',
   'event LoopClosed(uint256 btcSold, uint256 musdBought, uint256 btcOut, uint256 musdOut)',
 ]);
