@@ -62,6 +62,7 @@ describe("MorbitLoop", () => {
     const account = await accountFor(alice);
 
     assert.equal(await account.owner(), alice.address);
+    assert.equal(await account.mode(), 1n); // Loop
     assert.equal(await account.collateral(), toWei("0.07"));
     assert.equal(await account.debt(), toWei("2200"));
     assert.equal(await musd.balanceOf(await account.getAddress()), 0n, "all borrowed MUSD was swapped");
@@ -96,6 +97,7 @@ describe("MorbitLoop", () => {
     const gas = r.gasUsed * r.gasPrice;
 
     assert.equal(await bo.getTroveStatus(await account.getAddress()), 2n);
+    assert.equal(await account.mode(), 0n);
     assert.equal((await ethers.provider.getBalance(alice.address)) - btcBefore + gas, toWei("0.049"));
     assert.equal(await musd.balanceOf(alice.address), toWei("100"));
     assert.equal(await ethers.provider.getBalance(await account.getAddress()), 0n);
@@ -139,6 +141,7 @@ describe("MorbitLoop", () => {
       // 0.05 BTC ($5,000) backs 2,000 MUSD borrowed (2,200 debt): 227%.
       await factory.connect(alice).openEarn(toWei("2000"), Z, Z, { value: toWei("0.05") });
       const account = await accountFor(alice);
+      assert.equal(await account.mode(), 2n); // Earn
       assert.equal(await account.collateral(), toWei("0.05"));
       assert.equal(await account.debt(), toWei("2200"));
       assert.equal(await vault.balanceOf(alice.address), toWei("2000"));
@@ -156,6 +159,7 @@ describe("MorbitLoop", () => {
       const gas = r.gasUsed * r.gasPrice;
 
       assert.equal(await bo.getTroveStatus(await account.getAddress()), 2n);
+      assert.equal(await account.mode(), 0n);
       assert.equal(await vault.balanceOf(alice.address), 0n);
       assert.equal((await ethers.provider.getBalance(alice.address)) - btcBefore + gas, toWei("0.05"));
       assert.equal(await musd.balanceOf(alice.address), 0n);

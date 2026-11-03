@@ -106,6 +106,14 @@ contract MorbitLoopAccount is ReentrancyGuard {
     /// @dev BTC arrives from trove withdrawals, closing, and MUSD→BTC swaps.
     receive() external payable {}
 
+    /// @notice What the open trove is for, so apps can show the right controls.
+    enum Mode {
+        None,
+        Loop,
+        Earn
+    }
+    Mode public mode;
+
     // --- Views ---
 
     function collateral() external view returns (uint256) {
@@ -139,6 +147,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
         onlyOwner
         nonReentrant
     {
+        mode = Mode.Loop;
         borrowerOperations.openTrove{value: msg.value}(debtAmount, hints[0], hints[1]);
         uint256 bought = _buyBtc(debtAmount, minBtcOut);
         borrowerOperations.adjustTrove{value: bought}(0, 0, false, hints[2], hints[3]);
@@ -157,6 +166,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
         nonReentrant
         returns (uint256 shares)
     {
+        mode = Mode.Earn;
         borrowerOperations.openTrove{value: msg.value}(debtAmount, upperHint, lowerHint);
         uint256 borrowed = musd.balanceOf(address(this));
         musd.forceApprove(address(vault), borrowed);
@@ -243,6 +253,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
             musd.safeTransferFrom(owner, address(this), shortfall);
         }
         borrowerOperations.closeTrove();
+        mode = Mode.None;
     }
 
     function _sweep() internal returns (uint256 btcOut, uint256 musdOut) {
