@@ -101,6 +101,8 @@ describe("MorbitEarnVaultV2", () => {
       await vault.connect(bob).deposit(toWei("3000"), bob.address);
       // 400 MUSD of debt offset for 0.0044 BTC (440 MUSD at 100k): +40 MUSD of value.
       await pool.simulateLiquidation(toWei("400"), { value: toWei("0.0044") });
+      // These tests check the swap itself; the fee has its own tests below.
+      await vault.setPerformanceFee(0, owner.address);
     });
 
     it("swaps BTC gains to MUSD and redeposits them, raising the share price", async () => {
@@ -152,6 +154,65 @@ describe("MorbitEarnVaultV2", () => {
     it("cannot harvest without a swapper", async () => {
       await vault.setSwapper(ethers.ZeroAddress);
       await assert.rejects(vault.harvest(0n), /NoSwapper/);
+    });
+  });
+
+  describe("performance fee", () => {
+    beforeEach(async () => {
+      await vault.connect(alice).deposit(toWei("1000"), alice.address);
+      await vault.connect(bob).deposit(toWei("3000"), bob.address);
+      await pool.simulateLiquidation(toWei("400"), { value: toWei("0.0044") });
+    });
+
+    it("sends 10% of harvested yield to the fee recipient by default", async () => {
+      assert.equal(await vault.performanceFeeBps(), 1_000n);
+      assert.equal(await vault.feeRecipient(), owner.address);
+      const before = await musd.balanceOf(owner.address);
+      await vault.connect(keeper).harvest(0n);
+      // 0.0044 BTC → 440 MUSD; 44 to the fee, 396 compounded.
+      assert.equal((await musd.balanceOf(owner.address)) - before, toWei("44"));
+      assert.equal(await vault.totalFeesMusd(), toWei("44"));
+      assert.equal(await vault.totalCompoundedMusd(), toWei("396"));
+      assert.equal(await vault.totalMusd(), toWei("3996"));
+    });
+
+    it("never charges deposits or withdrawals", async () => {
+      await vault.connect(bob).deposit(toWei("1000"), bob.address);
+      const before = await musd.balanceOf(owner.address);
+      await vault.connect(alice).redeem(await vault.balanceOf(alice.address), alice.address, alice.address);
+      assert.equal(await musd.balanceOf(owner.address), before);
+    });
+
+    it("is capped at 20% and owner-only", async () => {
+      await assert.rejects(vault.setPerformanceFee(2_001, owner.address), /FeeTooHigh/);
+      await assert.rejects(vault.connect(alice).setPerformanceFee(0, alice.address), /OwnableUnauthorizedAccount/);
+      await vault.setPerformanceFee(2_000, bob.address);
+      const before = await musd.balanceOf(bob.address);
+      await vault.harvest(0n);
+      assert.equal((await musd.balanceOf(bob.address)) - before, toWei("88"));
+    });
+  });
+
+  describe("pool-emptying liquidation", () => {
+    it("still pays the BTC gain on redeem after the whole deposit was used up", async () => {
+      await vault.connect(alice).deposit(toWei("1000"), alice.address);
+      // A liquidation offsets all 1,000 MUSD for 0.011 BTC: the compounded deposit is now zero.
+      await pool.simulateLiquidation(toWei("1000"), { value: toWei("0.011") });
+      assert.equal(await pool.getCompoundedMUSDDeposit(await vault.getAddress()), 0n);
+      assert.equal(await vault.totalBtc(), toWei("0.011"));
+
+      const before = await ethers.provider.getBalance(bob.address);
+      await vault.connect(alice).redeem(await vault.balanceOf(alice.address), bob.address, alice.address);
+      assert.equal((await ethers.provider.getBalance(bob.address)) - before, toWei("0.011"));
+      assert.equal(await vault.totalBtc(), 0n);
+    });
+
+    it("harvests the BTC gain after the whole deposit was used up", async () => {
+      await vault.connect(alice).deposit(toWei("1000"), alice.address);
+      await pool.simulateLiquidation(toWei("1000"), { value: toWei("0.011") });
+      await vault.setPerformanceFee(0, owner.address);
+      await vault.harvest(0n);
+      assert.equal(await vault.totalMusd(), toWei("1100"));
     });
   });
 

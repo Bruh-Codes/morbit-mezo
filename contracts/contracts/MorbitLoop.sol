@@ -32,12 +32,21 @@ interface IMusdTroveManager {
 
 interface IMorbitSwapper is IBtcToMusdSwapper, IMusdToBtcSwapper {}
 
+/// @notice The Auto Earn vault (MorbitEarnVaultV2), an ERC20 of vault shares.
+interface IMorbitEarnVault {
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 musdOut, uint256 btcOut);
+}
+
 /**
  * @title MorbitLoopAccount
  * @notice A personal smart account that owns one MUSD trove, so a leveraged BTC position can be
  *         opened and closed in a single transaction:
  *           open:  deposit BTC → borrow MUSD → swap MUSD to BTC on Mezo Pools → add that BTC as collateral
  *           close: withdraw some BTC → swap it to MUSD → repay and close the trove → return BTC and MUSD
+ *         or a "Borrow & Earn" position, also in one transaction each way:
+ *           open:  deposit BTC → borrow MUSD → deposit it into Auto Earn, shares go to the owner
+ *           close: redeem the owner's shares → repay and close the trove → return BTC and MUSD
  *         Only the owner (or the factory, acting for the owner) can move funds. Every swap must also
  *         beat the MUSD oracle price minus `ORACLE_SLIPPAGE_BPS`, whatever minimum the caller passes.
  */
@@ -56,10 +65,13 @@ contract MorbitLoopAccount is ReentrancyGuard {
     IMusdPriceFeed public immutable priceFeed;
     IMorbitSwapper public immutable swapper;
     IERC20 public immutable musd;
+    IMorbitEarnVault public immutable vault;
 
     event LoopOpened(uint256 collateralIn, uint256 debt, uint256 btcBought);
     event LoopClosed(uint256 btcSold, uint256 musdBought, uint256 btcOut, uint256 musdOut);
     event CollateralAdded(uint256 amount);
+    event EarnOpened(uint256 collateralIn, uint256 debt, uint256 shares);
+    event EarnClosed(uint256 sharesRedeemed, uint256 btcOut, uint256 musdOut);
 
     error NotOwner();
     error InsufficientOutput(uint256 received, uint256 required);
@@ -72,6 +84,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
         address priceFeed;
         address swapper;
         address musd;
+        address vault;
     }
 
     constructor(address owner_, Config memory config) {
@@ -82,6 +95,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
         priceFeed = IMusdPriceFeed(config.priceFeed);
         swapper = IMorbitSwapper(config.swapper);
         musd = IERC20(config.musd);
+        vault = IMorbitEarnVault(config.vault);
     }
 
     modifier onlyOwner() {
@@ -131,6 +145,41 @@ contract MorbitLoopAccount is ReentrancyGuard {
         emit LoopOpened(msg.value, debtAmount, bought);
     }
 
+    /**
+     * @notice Borrow & Earn in one transaction: open a trove with `msg.value` BTC, borrow
+     *         `debtAmount` MUSD and deposit all of it into Auto Earn. The vault shares go straight
+     *         to the owner's wallet.
+     */
+    function openEarn(uint256 debtAmount, address upperHint, address lowerHint)
+        external
+        payable
+        onlyOwner
+        nonReentrant
+        returns (uint256 shares)
+    {
+        borrowerOperations.openTrove{value: msg.value}(debtAmount, upperHint, lowerHint);
+        uint256 borrowed = musd.balanceOf(address(this));
+        musd.forceApprove(address(vault), borrowed);
+        shares = vault.deposit(borrowed, owner);
+        emit EarnOpened(msg.value, debtAmount, shares);
+    }
+
+    /**
+     * @notice Unwind Borrow & Earn in one transaction: redeem `shares` of the owner's Auto Earn
+     *         shares (needs an allowance to this account), repay and close the trove, and send all
+     *         BTC and MUSD left to the owner. A MUSD shortfall is pulled from the owner as in
+     *         `closeLoop`.
+     */
+    function closeEarn(uint256 shares) external onlyOwner nonReentrant {
+        if (shares > 0) {
+            IERC20(address(vault)).safeTransferFrom(owner, address(this), shares);
+            vault.redeem(shares, address(this), address(this));
+        }
+        _repayAndClose();
+        (uint256 btcOut, uint256 musdOut) = _sweep();
+        emit EarnClosed(shares, btcOut, musdOut);
+    }
+
     /// @notice Add BTC to the trove to lower liquidation risk.
     function addCollateral(address upperHint, address lowerHint) external payable onlyOwner nonReentrant {
         borrowerOperations.adjustTrove{value: msg.value}(0, 0, false, upperHint, lowerHint);
@@ -158,18 +207,7 @@ contract MorbitLoopAccount is ReentrancyGuard {
             if (musdBought < required) revert InsufficientOutput(musdBought, required);
         }
 
-        // closeTrove burns the debt minus the refundable gas compensation, which comes back to us.
-        uint256 debtNow = troveManager.getTroveDebt(address(this));
-        uint256 need = debtNow > 200e18 ? debtNow - 200e18 : 0;
-        uint256 have = musd.balanceOf(address(this));
-        if (have < need) {
-            uint256 shortfall = need - have;
-            if (musd.allowance(owner, address(this)) < shortfall || musd.balanceOf(owner) < shortfall) {
-                revert NotEnoughMusdToClose(have, need);
-            }
-            musd.safeTransferFrom(owner, address(this), shortfall);
-        }
-        borrowerOperations.closeTrove();
+        _repayAndClose();
 
         (uint256 btcOut, uint256 musdOut) = _sweep();
         emit LoopClosed(btcToSell, musdBought, btcOut, musdOut);
@@ -192,6 +230,21 @@ contract MorbitLoopAccount is ReentrancyGuard {
         if (bought < required) revert InsufficientOutput(bought, required);
     }
 
+    /// @dev closeTrove burns the debt minus the refundable gas compensation, which comes back to us.
+    function _repayAndClose() internal {
+        uint256 debtNow = troveManager.getTroveDebt(address(this));
+        uint256 need = debtNow > 200e18 ? debtNow - 200e18 : 0;
+        uint256 have = musd.balanceOf(address(this));
+        if (have < need) {
+            uint256 shortfall = need - have;
+            if (musd.allowance(owner, address(this)) < shortfall || musd.balanceOf(owner) < shortfall) {
+                revert NotEnoughMusdToClose(have, need);
+            }
+            musd.safeTransferFrom(owner, address(this), shortfall);
+        }
+        borrowerOperations.closeTrove();
+    }
+
     function _sweep() internal returns (uint256 btcOut, uint256 musdOut) {
         musdOut = musd.balanceOf(address(this));
         if (musdOut > 0) musd.safeTransfer(owner, musdOut);
@@ -205,8 +258,8 @@ contract MorbitLoopAccount is ReentrancyGuard {
 
 /**
  * @title MorbitLoopFactory
- * @notice Creates one MorbitLoopAccount per wallet. `openLoop` creates the account when needed and
- *         opens the loop in the same transaction, so a first-time user signs once.
+ * @notice Creates one MorbitLoopAccount per wallet. `openLoop` and `openEarn` create the account
+ *         when needed and open the position in the same transaction, so a first-time user signs once.
  */
 contract MorbitLoopFactory {
     MorbitLoopAccount.Config public config;
@@ -234,5 +287,15 @@ contract MorbitLoopFactory {
     {
         account = createAccount();
         account.openLoop{value: msg.value}(debtAmount, minBtcOut, hints);
+    }
+
+    /// @notice Borrow & Earn for a first-time user in one signature (creates the account if needed).
+    function openEarn(uint256 debtAmount, address upperHint, address lowerHint)
+        external
+        payable
+        returns (MorbitLoopAccount account, uint256 shares)
+    {
+        account = createAccount();
+        shares = account.openEarn{value: msg.value}(debtAmount, upperHint, lowerHint);
     }
 }

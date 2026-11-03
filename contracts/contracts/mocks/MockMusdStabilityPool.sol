@@ -38,7 +38,9 @@ contract MockMusdStabilityPool {
     }
 
     function withdrawFromSP(uint256 amount) external {
-        require(deposits[msg.sender] > 0, "no deposit");
+        // Like MUSD, a depositor whose deposit was wiped out by a liquidation can still withdraw(0)
+        // to collect the BTC gain.
+        require(deposits[msg.sender] > 0 || gains[msg.sender] > 0, "no deposit");
         if (amount != 0) require(!undercollateralized, "StabilityPool: Cannot withdraw while there are troves with ICR < MCR");
         uint256 out = amount > deposits[msg.sender] ? deposits[msg.sender] : amount;
         deposits[msg.sender] -= out;
