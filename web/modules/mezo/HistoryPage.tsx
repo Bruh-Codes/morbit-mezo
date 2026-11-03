@@ -98,8 +98,8 @@ function useChainEvents(kind: 'vault' | 'trove', account?: `0x${string}`) {
       const vaultEvents = async (): Promise<ChainEvent[]> => {
         if (!mezo.earnVault) return [];
         const parts = [vaultHistory(mezo.earnVault, mezo.earnVaultDeployBlock, EARN.name)];
-        if (mezo.legacyVault)
-          parts.push(vaultHistory(mezo.legacyVault, LEGACY_VAULT_BLOCK, 'Simple Earn'));
+        for (const v of mezo.legacyVaults)
+          parts.push(vaultHistory(v.address, v.deployBlock, v.name));
         if (mezo.autoEarn)
           parts.push(
             cachedChunked<ChainEvent>(

@@ -232,26 +232,23 @@ export function DashboardPage() {
                             </TableCell>
                           </TableRow>
                         )}
-                        {position.legacy && (
-                          <TableRow>
+                        {position.legacy.map((legacy) => (
+                          <TableRow key={legacy.address}>
                             <TableCell>
                               <Name
                                 icon="mvMUSD"
-                                title="Simple Earn"
-                                sub={`Move to ${EARN.name} for MEZO rewards`}
+                                title={legacy.name}
+                                sub={`Move to the new ${EARN.name}`}
                               />
                             </TableCell>
                             <TableCell align="right">
-                              <Cell
-                                main="—"
-                                sub={`${fmtAmount(position.legacy.shares, 2)} shares`}
-                              />
+                              <Cell main="—" sub={`${fmtAmount(legacy.shares, 2)} shares`} />
                             </TableCell>
                             <TableCell align="right">
                               <Cell main="—" />
                             </TableCell>
                             <TableCell align="right">
-                              <Cell main={fmtUsd(position.legacy.value)} />
+                              <Cell main={fmtUsd(legacy.value)} />
                             </TableCell>
                             <TableCell align="right">
                               <Cell main="—" />
@@ -263,8 +260,8 @@ export function DashboardPage() {
                               <Actions items={[['Move', '/earn/']]} />
                             </TableCell>
                           </TableRow>
-                        )}
-                        {!active && !vault.shares && !position.legacy && (
+                        ))}
+                        {!active && !vault.shares && !position.legacy.length && (
                           <TableRow>
                             <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                               <Typography color="text.secondary" sx={{ mb: 1.5 }}>

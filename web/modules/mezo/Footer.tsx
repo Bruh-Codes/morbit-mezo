@@ -14,7 +14,9 @@ const CONTRACTS: [string, string | undefined][] = [
   ['TroveManager', mezo.troveManager],
   ['PriceFeed', mezo.priceFeed],
   [mezo.autoEarn ? 'Auto Earn vault' : 'Simple Earn vault', mezo.earnVault],
-  ...(mezo.legacyVault ? ([['Simple Earn vault', mezo.legacyVault]] as [string, string][]) : []),
+  ...mezo.legacyVaults.map((v) => [`${v.name} vault`, v.address] as [string, string]),
+  ...(mezo.loopFactory ? ([['Loop factory', mezo.loopFactory]] as [string, string][]) : []),
+  ...(mezo.maMusdPool ? ([['maMUSD/MUSD pool', mezo.maMusdPool]] as [string, string][]) : []),
   ...(mezo.autoEarn
     ? ([['Mezo Pools router', mezo.mezoRouter]] as [string, string | undefined][])
     : []),

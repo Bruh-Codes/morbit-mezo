@@ -26,4 +26,8 @@ export const INFO: Record<string, string> = {
   'BTC exposure': 'All BTC in the loop: your deposit plus the BTC bought with borrowed MUSD.',
   'Loop net value': 'BTC exposure at the oracle price minus debt. This is what you own.',
   Withdrawable: 'What you get if you withdraw all shares now.',
+  'Performance fee':
+    'Share of each compounding that goes to Morbit. Taken only from BTC gains, never from deposits.',
+  'maMUSD pool':
+    'Stable pool on Mezo Pools. Trade Auto Earn shares for MUSD without withdrawing, or add liquidity to earn swap fees.',
 };

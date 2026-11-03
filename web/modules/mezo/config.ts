@@ -13,9 +13,16 @@ const dep = deployment as typeof deployment & {
   mezoRouter?: string;
   poolFactory?: string;
   loopFactory?: string;
+  legacyAutoEarnVault?: string;
+  legacyAutoEarnVaultDeployBlock?: number;
+  maMusdPool?: string;
 };
 const simpleEarnVault = asAddress(dep.earnVault);
 const autoEarnVault = asAddress(dep.autoEarnVault);
+const previousAutoEarn = asAddress(dep.legacyAutoEarnVault);
+
+/** Earlier vaults that stay open for withdrawals after a newer one takes over the Earn page. */
+export type LegacyVault = { name: string; address: Address; auto: boolean; deployBlock: bigint };
 
 export const mezoTestnet = defineChain({
   id: MEZO_TESTNET_ID,
@@ -49,7 +56,30 @@ export const mezo = {
     (autoEarnVault ? dep.autoEarnVaultDeployBlock : dep.earnVaultDeployBlock) || 0
   ),
   autoEarn: !!autoEarnVault,
-  legacyVault: autoEarnVault ? simpleEarnVault : undefined,
+  legacyVaults: [
+    ...(autoEarnVault && simpleEarnVault
+      ? [
+          {
+            name: 'Simple Earn',
+            address: simpleEarnVault,
+            auto: false,
+            deployBlock: BigInt(dep.earnVaultDeployBlock || 0),
+          },
+        ]
+      : []),
+    ...(previousAutoEarn
+      ? [
+          {
+            name: 'Previous Auto Earn',
+            address: previousAutoEarn,
+            auto: true,
+            deployBlock: BigInt(dep.legacyAutoEarnVaultDeployBlock || 0),
+          },
+        ]
+      : []),
+  ] as LegacyVault[],
+  /** maMUSD/MUSD stable pool on Mezo Pools. */
+  maMusdPool: asAddress(dep.maMusdPool),
   mezoRouter: asAddress(dep.mezoRouter),
   poolFactory: asAddress(dep.poolFactory),
   loopFactory: asAddress(dep.loopFactory),

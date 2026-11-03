@@ -7,10 +7,33 @@
 <p align="center"><b>Borrow MUSD against your BTC, then put that MUSD to work. Live on Mezo testnet.</b></p>
 
 <p align="center">
-  Built for the <a href="https://app.akindo.io/wave-hacks/OVOO0gdrVU8379D10">Mezo Buildathon</a>, DeFi track
+  Built for the <a href="https://app.akindo.io/wave-hacks/OVOO0gdrVU8379D10">Mezo Buildathon</a>
 </p>
 
+| | |
+|---|---|
+| **Track** | Track 1: DeFi (MUSD and MEZO integration). The Telegram liquidation alerts bot also fits Track 2. |
+| **Team** | Dickson ([Bruh-Codes](https://github.com/Bruh-Codes)): contracts, web app and bot. |
+| **Try it** | [Tester guide](docs/TESTING.md) · [Live app](https://morbit-mezo.vercel.app) · [Alerts bot](https://t.me/Morbit_testnet_bot) |
+| **Background** | Morbit started as a real-world-asset lending app (an Aave UI fork with our own `RWAPool` contract, [Bruh-Codes/Morbit](https://github.com/Bruh-Codes/Morbit)). For the buildathon we rebuilt it for Bitcoin on Mezo: every contract in this repo is new and MUSD-native, and the UI kept only the Aave-style layout. |
+
 ![Overview](docs/screenshots/01-overview.png)
+
+## Wave 2 judge feedback, addressed
+
+| Feedback | What we did |
+|---|---|
+| Build the one-click borrow-into-vault loop in a contract | **Borrow & Earn**: `MorbitLoopAccount.openEarn` opens a MUSD trove and deposits everything borrowed into Auto Earn in one transaction, with the shares going to the user's wallet. `closeEarn` redeems the shares, repays, closes and returns the BTC plus any BTC the vault earned. First-time users sign once through the factory. |
+| Give the vault share a downstream use | A **maMUSD/MUSD stable pool on Mezo Pools**, created and seeded by the deploy script. Auto Earn shares can be swapped for MUSD without withdrawing, or LP'd for swap fees. |
+| Redeem should collect BTC even when the deposit is wiped | `redeem` and `harvest` now call `withdrawFromSP(0)` whenever `getDepositorCollateralGain > 0`, even with a zero compounded deposit. Tested with a liquidation that empties the vault's whole deposit. |
+| Verify the vault on the explorer | The deploy script verifies every new contract on the Mezo explorer (Blockscout). `yarn verify:mezo` re-runs it. |
+| Explain the Stability Pool withdrawal block | The app shows "A loan is waiting to be liquidated, which pauses Stability Pool withdrawals. Try again in a few minutes." instead of the revert, and our keeper liquidates those loans every 5 minutes. |
+| Revenue model | A **10% performance fee** on compounded BTC gains (owner-set, hard cap 20%, never on deposits or withdrawals). It is shown in the app before you deposit. |
+| Get real users through the full flow | A step-by-step [tester guide](docs/TESTING.md) covering borrow, Auto Earn, Borrow & Earn, a BTC-gain payout, the loop, the pool and the alerts bot. |
+
+## Revenue model
+
+Morbit earns only when depositors earn. Auto Earn keeps 10% of each compounding, taken from the MUSD that BTC liquidation gains are swapped into. Nothing is charged on deposits, withdrawals, loans or loops. The fee is set on chain (`performanceFeeBps`, capped at 20%), every change emits an event, and the app shows the current rate. On mainnet the same fee would fund audits and the keeper that liquidates loans and compounds the vault.
 
 ## What's new in Wave 2
 
@@ -23,7 +46,7 @@ Wave 1 shipped borrowing and Simple Earn. Wave 2 goes deeper into MUSD and adds 
 | **One-click BTC loop** | New [`MorbitLoopAccount`](contracts/contracts/MorbitLoop.sol). A personal account owns a MUSD trove, so *deposit BTC → borrow MUSD → buy BTC on Mezo Pools → add as collateral* is a single transaction, at 1.5x, 2x or 2.5x. Closing is one transaction too. | Leveraged BTC built only from MUSD and Mezo Pools. |
 | **Liquidation alerts** | A [Telegram bot](alerts/) watches your loan and loop and warns you below 160%, escalating near liquidation or in recovery mode. It subscribes in one tap from the app and can also run the Auto Earn keeper. | Track 2: meets users where they are. |
 | **Flow fixes** | Loan history no longer disappears after about two days, and history is cached so it loads fast. You can withdraw from Earn by amount or %. Loans under 160% are flagged with a "add BTC" next step. Borrow more has a Safe max. Protocol errors read in plain English. | Found by walking every flow against live testnet. |
-| **Security** | 34 contract tests (up from 9), live `eth_call` simulations of every swap and loop path, and a written [security review](docs/SECURITY.md). | |
+| **Security** | 43 contract tests (up from 9), live `eth_call` simulations of every swap and loop path, and a written [security review](docs/SECURITY.md). | |
 
 ## What it does
 
@@ -71,7 +94,8 @@ Every number in the app comes live from Mezo testnet. There is no mock data. Eac
 | Loan history | BorrowerOperations | `TroveUpdated` events |
 | Auto-compounding, loops | Mezo Pools Router (BTC/MUSD pool) | `swapExactTokensForTokens`, `getAmountsOut` |
 | MEZO rewards and APR | MEZO token, Mezo Pools (MEZO/MUSD) | `transfer`, `getAmountsOut` |
-| Loop trove | BorrowerOperations (called by the user's loop account) | `openTrove`, `adjustTrove`, `closeTrove` |
+| Loop and Borrow & Earn trove | BorrowerOperations (called by the user's Morbit account) | `openTrove`, `adjustTrove`, `closeTrove` |
+| maMUSD/MUSD pool | Mezo Pools PoolFactory, Router | `createPool`, `addLiquidity` |
 
 ### MorbitEarnVault
 
@@ -132,7 +156,7 @@ The app asks your wallet to add and switch to Mezo testnet. It reads contract ad
 ```bash
 cd contracts
 yarn install
-yarn test          # 34 tests: vaults, loop, against mocks of the MUSD system
+yarn test          # 43 tests: vaults, loop, Borrow & Earn, against mocks of the MUSD system
 ```
 
 To deploy your own vault and run a live end-to-end check, store a funded testnet key in the Hardhat keystore. The key never goes in a file.
@@ -155,6 +179,8 @@ The smoke test locks 0.04 BTC by default (`SMOKE_COLL_BTC`), because the minimum
 | `yarn smoke:auto-earn` | Deposit, harvest, claim and redeem against live Auto Earn |
 | `yarn finish:wave2` | Seeds Auto Earn and starts a MEZO stream (`REWARD_MEZO`) if `deploy:wave2` stopped early |
 | `yarn liquidate` | Liquidates loans under 110% (this unblocks Stability Pool withdrawals) and compounds Auto Earn |
+| `yarn deploy:earn-v3` | Judge-feedback release: new Auto Earn vault (fee, wiped-deposit fix), Loop factory with Borrow & Earn, maMUSD/MUSD pool (`POOL_MUSD`, default 10), optional `REWARD_MEZO`, explorer verification. The previous vault stays listed for withdrawals |
+| `yarn verify:mezo` | Verifies the current vault, Loop factory and swapper on the Mezo explorer |
 
 ### Deploy the web app
 
@@ -173,7 +199,7 @@ contracts/
   contracts/MorbitEarnVault.sol   Simple Earn vault
   contracts/MorbitEarnVaultV2.sol Auto Earn: compounding via Mezo Pools + MEZO rewards
   contracts/MezoPoolsSwapper.sol  BTC <-> MUSD on Mezo Pools
-  contracts/MorbitLoop.sol        One-click BTC loop account + factory
+  contracts/MorbitLoop.sol        Morbit account + factory: one-click BTC loop and Borrow & Earn
   contracts/mocks/                Test doubles: Stability Pool, PriceFeed, MUSD
   test/                           Vault, Auto Earn and loop tests
   scripts/deploy-mezo.js          Deploys the vault, writes the web config
@@ -185,6 +211,7 @@ web/
   ui-config/mezoDeployment.json   Addresses the app reads
 alerts/                           Telegram liquidation alerts bot + Auto Earn keeper
 docs/SECURITY.md                  Security review
+docs/TESTING.md                   Tester guide
 ```
 
 ## Limits
