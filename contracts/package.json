@@ -6,7 +6,9 @@
     "compile": "hardhat compile",
     "test": "hardhat compile && node --import tsx/esm --test \"test/*.ts\"",
     "deploy:mezo": "hardhat run scripts/deploy-mezo.js --network mezoTestnet",
-    "smoke:mezo": "hardhat run scripts/smoke-mezo.js --network mezoTestnet"
+    "smoke:mezo": "hardhat run scripts/smoke-mezo.js --network mezoTestnet",
+    "deploy:auto-earn": "hardhat run scripts/deploy-auto-earn.js --network mezoTestnet",
+    "smoke:auto-earn": "hardhat run scripts/smoke-auto-earn.js --network mezoTestnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.13",
